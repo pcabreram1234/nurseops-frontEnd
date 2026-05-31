@@ -60,6 +60,7 @@ apiInstance.interceptors.response.use(
     if (error.response?.status === 401) {
       if (typeof window !== 'undefined') {
         localStorage.removeItem('auth_token');
+        window.location.href = '/login'
         // Aquí podrías disparar un window.location.href = '/login' si deseas forzar la salida
       }
     }
