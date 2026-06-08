@@ -3,7 +3,7 @@ import React from "react";
 import { ScheduleEntry } from "../types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { typeStyles } from "../types"; // Importación del Record que provees
+import { typeStyles } from "../types"; 
 
 interface Props {
     isOpen: boolean;
@@ -18,13 +18,30 @@ export const ShiftDetailsModal: React.FC<Props> = ({ isOpen, onClose, entry }) =
         ? `${entry.nurse.user.firstName} ${entry.nurse.user.lastName}` 
         : "TURNO ABIERTO (Sin asignar)";
 
-    // 🌟 ASIGNACIÓN INTELIGENTE DEL COLOR DE TURNOS
-    // Extraemos el tipo y nos aseguramos de caer en UNKNOWN si viene vacío o no coincide con el Record
     const shiftType = entry.shift?.type || "UNKNOWN";
     const badgeClass = typeStyles[shiftType] || typeStyles.UNKNOWN;
 
     // Formateo amigable de la fecha
     const dateFormatted = format(parseISO(entry.date), "EEEE, d 'de' MMMM, yyyy", { locale: es });
+
+    // 🌟 REPARACIÓN DEL DESFASE HORARIO: Helper idéntico al de FullCalendar
+    const formatTimeStr = (isoString?: string | null) => {
+        if (!isoString) return "--:--";
+        if (!isoString.includes("T")) return isoString.substring(0, 5);
+        const timePart = isoString.split("T")[1];
+        return timePart ? timePart.substring(0, 5) : "--:--";
+    };
+
+    const startTime = formatTimeStr(entry.shift?.startTime);
+    const endTime = formatTimeStr(entry.shift?.endTime);
+
+    // 🌟 INFORMACIÓN ADICIONAL EXTRAÍDA RECIENTEMENTE
+    const departmentName = entry.shiftTemplate?.department?.name || "General / No especificado";
+    const templateName = entry.shiftTemplate?.name || entry.shift?.name || "Personalizado";
+    
+    // Validar si es un préstamo (El departamento del turno es diferente al nativo de la enfermera)
+    const isCrossDepartment = entry.nurse && entry.shiftTemplate && 
+        (entry.nurse as any).departmentId !== (entry.shiftTemplate as any).departmentId;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-150">
@@ -42,13 +59,21 @@ export const ShiftDetailsModal: React.FC<Props> = ({ isOpen, onClose, entry }) =
 
                 {/* Contenido */}
                 <div className="space-y-4">
+                    {/* Información del Personal */}
                     <div>
                         <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Asignado a</span>
                         <div className={`font-bold text-lg mt-0.5 ${!entry.nurse ? 'text-amber-600' : 'text-slate-800'}`}>
                             {nurseName}
                         </div>
+                        {/* 🌟 NUEVO: Badge Informativo de Préstamo Interdepartamental */}
+                        {isCrossDepartment && (
+                            <span className="inline-block mt-1 text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md animate-pulse">
+                                🔄 Préstamo de Personal (Cambio de área temporal)
+                            </span>
+                        )}
                     </div>
 
+                    {/* Bloques principales de Tiempos */}
                     <div className="grid grid-cols-2 gap-4">
                         <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                             <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Fecha</span>
@@ -57,35 +82,51 @@ export const ShiftDetailsModal: React.FC<Props> = ({ isOpen, onClose, entry }) =
                         <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                             <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Horario</span>
                             <div className="text-sm font-bold text-slate-700 mt-0.5">
-                                🕒 {format(parseISO(entry.shift.startTime), "HH:mm")} - {format(parseISO(entry.shift.endTime), "HH:mm")}
+                                🕒 {startTime} - {endTime}
                             </div>
                         </div>
                     </div>
 
+                    {/* 🌟 NUEVO SECTOR: Ubicación Operativa y Configuración Maestra */}
+                    <div className="bg-slate-50/60 p-3 rounded-xl border border-slate-100/80 grid grid-cols-2 gap-2">
+                        <div>
+                            <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Departamento / Área</span>
+                            <span className="text-xs font-bold text-slate-800 mt-0.5 block truncate">
+                                🏥 {departmentName}
+                            </span>
+                        </div>
+                        <div>
+                            <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Esquema Aplicado</span>
+                            <span className="text-xs font-medium text-slate-600 mt-0.5 block truncate">
+                                ⚙️ {templateName}
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Clasificación */}
                     <div>
                         <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
                             Clasificación del Turno
                         </span>
                         <div className="flex flex-wrap items-center gap-1.5">
-                            {/* 🌟 APLICACIÓN DINÁMICA DE TUS ESTILOS CON BORDES */}
                             <span className={`px-2.5 py-1 text-xs font-bold rounded-full uppercase border ${badgeClass}`}>
                                 {shiftType === "UNKNOWN" ? "No Definido" : shiftType.replace("_", " ")}
                             </span>
                             
-                            {/* Atributos Adicionales */}
-                            {entry.shift.isNightShift && (
+                            {entry.shift?.isNightShift && (
                                 <span className="px-2.5 py-1 bg-slate-800 text-white text-[11px] font-bold rounded-full flex items-center gap-1 shadow-sm">
                                     Nocturno 🌙
                                 </span>
                             )}
                             {entry.isEmergencyCoverage && (
-                                <span className="px-2.5 py-1 bg-red-100 text-red-800 border border-red-200 text-[11px] font-bold rounded-full animate-pulse flex items-center gap-1">
+                                <span className="px-2.5 py-1 bg-red-100 text-red-800 border border-red-200 text-[11px] font-bold rounded-full flex items-center gap-1">
                                     Emergencia 🚨
                                 </span>
                             )}
                         </div>
                     </div>
 
+                    {/* Observaciones */}
                     {entry.notes && (
                         <div>
                             <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Observaciones</span>

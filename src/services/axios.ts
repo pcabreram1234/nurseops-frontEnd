@@ -27,6 +27,18 @@ apiInstance.interceptors.request.use(
 // 2. NUEVO: INTERCEPTOR DE RESPUESTAS (Response) - Capturar Mensajes Globales
 apiInstance.interceptors.response.use(
   (response) => {
+
+    /**
+     * 🔄 CAPTURA DEL TOKEN AUTOMÁTICO DESDE EL BACKEND
+     * Si el backend adjuntó un nuevo token en los headers, lo guardamos inmediatamente.
+     */
+    const nuevoToken = response.headers['x-new-access-token'];
+
+    if (nuevoToken && typeof window !== 'undefined') {
+      console.log("⚡ Token actualizado automáticamente por actividad.");
+      localStorage.setItem('auth_token', nuevoToken); // Sobrescribe el viejo token expirado
+    }
+    
     /**
      * CASO DE ÉXITO (HTTP Status 2xx)
      * Si el backend responde con éxito y adjunta una propiedad 'mensaje',

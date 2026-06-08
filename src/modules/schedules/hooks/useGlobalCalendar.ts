@@ -1,6 +1,6 @@
 // @/modules/schedules/hooks/useGlobalCalendar.ts
 import { useState } from "react";
-import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { useQuery, useQueryClient, } from "@tanstack/react-query";
 import { scheduleService } from "../services/scheduleService";
 
 export const useGlobalCalendar = () => {
@@ -11,7 +11,7 @@ export const useGlobalCalendar = () => {
 
     // Query para los turnos asignados
     const { data: entries = [], isLoading: isLoadingEntries, isFetching } = useQuery({
-        queryKey: ["schedule-entries", dateRange.startDate, dateRange.endDate, selectedDepartment],
+        queryKey: ["global-calendar", dateRange.startDate, dateRange.endDate, selectedDepartment],
         queryFn: () => scheduleService.getEntriesByDateRange(dateRange.startDate, dateRange.endDate, selectedDepartment),
         // Solo ejecutamos si tenemos un rango de fecha válido (FullCalendar lo seteará al montar)
         enabled: !!dateRange.startDate && !!dateRange.endDate,
@@ -23,15 +23,7 @@ export const useGlobalCalendar = () => {
         queryFn: scheduleService.getDepartments
     });
 
-    // Nueva Mutación para Drag and Drop
-    const updateEntryMutation = useMutation({
-        mutationFn: ({ id, date }: { id: string; date: string }) =>
-            scheduleService.updateEntry(id, { date }),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["schedule-entries"] });
-            // Aquí podrías disparar un toast de éxito
-        }
-    });
+
 
     return {
         entries,
@@ -41,7 +33,5 @@ export const useGlobalCalendar = () => {
         setDateRange,
         selectedDepartment,
         setSelectedDepartment,
-        updateEntry: updateEntryMutation.mutateAsync,
-        isUpdating: updateEntryMutation.isPending
     };
 };

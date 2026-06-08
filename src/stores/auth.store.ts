@@ -4,6 +4,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 // 1. Definición del contrato del usuario autenticado basado en tu modelo de negocio
 export interface AuthUser {
     id: string;
+    sub:string;
     email: string;
     name: string;
     organizationId: string;

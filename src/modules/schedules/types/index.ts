@@ -45,9 +45,12 @@ export interface ScheduleEntry {
     schedule: Schedule;
     shiftTemplate?: {
         name: string;
+        startTime: string;
+        endTime: string;
         department: {
             name: string;
             description: string | null;
+            id: string;
         };
     };
 }

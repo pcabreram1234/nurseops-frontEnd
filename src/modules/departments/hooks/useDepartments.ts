@@ -14,16 +14,16 @@ export function useDepartments() {
     const createMutation = useMutation({
         mutationFn: departmentService.create,
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["departments"] });
+            queryClient.invalidateQueries({ queryKey: ["departments", "departments-list"] });
             toast.success("Departamento registrado exitosamente");
         }
     });
 
     const updateMutation = useMutation({
-        mutationFn: ({ id, data }: { id: string; data: DepartmentFormData }) => 
+        mutationFn: ({ id, data }: { id: string; data: DepartmentFormData }) =>
             departmentService.update(id, data),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["departments"] });
+            queryClient.invalidateQueries({ queryKey: ["departments", "departments-list"] });
             toast.success("Configuración del departamento actualizada");
         }
     });
@@ -31,7 +31,7 @@ export function useDepartments() {
     const deleteMutation = useMutation({
         mutationFn: departmentService.delete,
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["departments"] });
+            queryClient.invalidateQueries({ queryKey: ["departments", "departments-list"] });
             toast.success("Departamento eliminado del sistema");
         }
     });

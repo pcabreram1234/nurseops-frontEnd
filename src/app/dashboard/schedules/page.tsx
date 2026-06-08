@@ -1,17 +1,31 @@
 "use client"
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
-import esLocale from "@fullcalendar/core/locales/es"; 
+import esLocale from "@fullcalendar/core/locales/es";
 import { useGlobalCalendar } from "@/modules/schedules/hooks/useGlobalCalendar";
 import { ScheduleEntry } from "@/modules/schedules/types";
 import { ShiftDetailsModal } from "@/modules/schedules/components/ShiftDetailsModal";
 import { ScheduleEntryModal } from "@/modules/schedules/components/ScheduleEntryModal";
 import { useNurses } from "@/modules/nurses/hooks/useNurses";
 import { useShifts } from "@/modules/schedules/hooks/useShifts";
+import { useScheduleEntries } from "@/modules/schedules/hooks/useScheduleEntries";
+import { PublishSettingsModal } from "@/modules/schedules/components/PublishSettingsModal";
+import { GenerateEngineModal } from "@/modules/schedules/components/GenerateEngineModal";
+import { toast } from "sonner";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"; // Ajusta la ruta según tu proyecto
 
 type CalendarViewMode = "summary" | "all_staff";
 
@@ -25,26 +39,26 @@ interface DecisionModalProps {
 const ActionDecisionModal: React.FC<DecisionModalProps> = ({ isOpen, onClose, onSelectDetails, onSelectEdit, nurseName }) => {
     if (!isOpen) return null;
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-150">
             <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-150">
                 <h3 className="text-base font-bold text-slate-900 mb-1">Gestión de Asignación</h3>
                 <p className="text-xs text-slate-500 mb-5">
                     Selecciona la acción que deseas realizar para <span className="font-semibold text-slate-800">{nurseName}</span>.
                 </p>
                 <div className="flex flex-col gap-2">
-                    <button 
+                    <button
                         onClick={onSelectEdit}
                         className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm"
                     >
                         ✏️ Editar o Modificar Asignación
                     </button>
-                    <button 
+                    <button
                         onClick={onSelectDetails}
                         className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl transition-colors"
                     >
                         🔍 Ver Detalles del Turno
                     </button>
-                    <button 
+                    <button
                         onClick={onClose}
                         className="w-full bg-red-400 text-black font-bold hover:bg-red-600 hover:text-white hover:font-bold rounded-xl py-2 mt-1 text-xs  transition-colors text-center"
                     >
@@ -56,34 +70,153 @@ const ActionDecisionModal: React.FC<DecisionModalProps> = ({ isOpen, onClose, on
     );
 };
 
+
+
+// Configuración dinámica para pintar de forma exacta cada estado del ciclo de vida del calendario
+const SCHEDULE_STATUS_CONFIG: Record<
+    "DRAFT" | "GENERATING" | "GENERATED" | "UNDER_REVIEW" | "APPROVED" | "PUBLISHED" | "ARCHIVED" | "CANCELLED" | "EMPTY",
+    { label: string; icon: string; bgIcon: string; bgTag: string; pulse: boolean }
+> = {
+    DRAFT: {
+        label: "Borrador",
+        icon: "📝",
+        bgIcon: "bg-amber-100 text-amber-800",
+        bgTag: "bg-amber-200 text-amber-900",
+        pulse: false,
+    },
+    GENERATING: {
+        label: "Generando con IA...",
+        icon: "🤖",
+        bgIcon: "bg-blue-100 text-blue-800",
+        bgTag: "bg-blue-600 text-white",
+        pulse: true, // Animación activa mientras el Engine calcula
+    },
+    GENERATED: {
+        label: "Generado (Engine)",
+        icon: "✨",
+        bgIcon: "bg-indigo-100 text-indigo-800",
+        bgTag: "bg-indigo-200 text-indigo-900",
+        pulse: false,
+    },
+    UNDER_REVIEW: {
+        label: "En Revisión",
+        icon: "👁️",
+        bgIcon: "bg-orange-100 text-orange-800",
+        bgTag: "bg-orange-200 text-orange-900",
+        pulse: false,
+    },
+    APPROVED: {
+        label: "Aprobado",
+        icon: "✅",
+        bgIcon: "bg-teal-100 text-teal-800",
+        bgTag: "bg-teal-200 text-teal-900",
+        pulse: false,
+    },
+    PUBLISHED: {
+        label: "Publicado Oficial",
+        icon: "🚀",
+        bgIcon: "bg-emerald-100 text-emerald-800",
+        bgTag: "bg-emerald-200 text-emerald-900",
+        pulse: false,
+    },
+    ARCHIVED: {
+        label: "Archivado",
+        icon: "📦",
+        bgIcon: "bg-slate-100 text-slate-800",
+        bgTag: "bg-slate-200 text-slate-900",
+        pulse: false,
+    },
+    CANCELLED: {
+        label: "Cancelado",
+        icon: "❌",
+        bgIcon: "bg-red-100 text-red-800",
+        bgTag: "bg-red-200 text-red-900",
+        pulse: false,
+    },
+    EMPTY: {
+        label: "Vacío",
+        icon: "📭", // O puedes usar "📅" para una metáfora de calendario inicial
+        bgIcon: "bg-slate-100 text-slate-500",
+        bgTag: "bg-slate-200 text-slate-800",
+        pulse: false, // Permanecer estático ya que es un estado de espera pasivo
+    },
+}
+
+
 export default function GlobalSchedulesPage() {
     const {
         entries,
         departments,
-        isLoading,
         setDateRange,
         selectedDepartment,
         setSelectedDepartment,
-        updateEntry
     } = useGlobalCalendar();
-    
+    const { createEntries, updateEntry: inlineUpdateMutation, deleteEntry, publishSchedule, genrateSchedule, isPublishing, isGenerating } = useScheduleEntries()
+
+    // 🟢 NUEVOS ESTADOS DE CONTROL PARA LOS PANELES DE ACCIÓN GLOBAL
+    const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
+    const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
+
+
+    // Mapeamos el nombre del departamento activo para el modal instructivo del Engine
+    const activeDeptName = useMemo(() => {
+        return departments.find(d => d.id === selectedDepartment)?.name;
+    }, [selectedDepartment, departments]);
+
     const { nurses } = useNurses();
     const { shifts, fetchShiftsForDay } = useShifts(selectedDepartment);
 
     const [viewMode, setViewMode] = useState<CalendarViewMode>("summary");
-    const [isVacantCollapsed, setIsVacantCollapsed] = useState<boolean>(false); 
-    
+    const [isVacantCollapsed, setIsVacantCollapsed] = useState<boolean>(false);
+
     const [selectedEntry, setSelectedEntry] = useState<ScheduleEntry | null>(null);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [selectedDateForCreation, setSelectedDateForCreation] = useState<Date | null>(null);
-    
-    // 🌟 NUEVO: Estado para capturar si se edita un solo registro específico
+
     const [selectedSingleEntryId, setSelectedSingleEntryId] = useState<string | null>(null);
     const [decisionTarget, setDecisionTarget] = useState<ScheduleEntry | null>(null);
 
+    // 🌟 NUEVO ESTADO: Guarda el ID del ScheduleEntry que se quiere borrar
+    const [entryToDeleteId, setEntryToDeleteId] = useState<string | null>(null);
+    const [isDeletingLoading, setIsDeletingLoading] = useState(false);
+
+    const handleDeleteConfirm = async () => {
+        console.log(entryToDeleteId)
+        if (!entryToDeleteId) return;
+        console.log(entryToDeleteId)
+        try {
+            setIsDeletingLoading(true);
+            await deleteEntry(entryToDeleteId);
+            setEntryToDeleteId(null); // Cierra el AlertDialog
+        } catch (err: any) {
+            toast.error(`Error al eliminar: ${err.message}`);
+        } finally {
+            setIsDeletingLoading(false);
+        }
+    };
+
+    const scheduleState = useMemo(() => {
+        if (!entries || entries.length === 0) return { id: null, status: "EMPTY" };
+
+        // Obtenemos el registro del horario asociado
+        const firstEntry = entries[0];
+        const scheduleId = firstEntry.scheduleId;
+
+        // Extraemos el status (mapeado de la relación o por defecto DRAFT si el engine lo generó)
+        const status = (firstEntry as any).schedule?.status || "DRAFT";
+
+        return {
+            id: scheduleId,
+            status: status as "DRAFT" | "PUBLISHED" | "EMPTY"
+        };
+    }, [entries]);
+
+
+    const lastProcessedRange = useRef<{ start: string; end: string } | null>(null)
+
     const calendarEvents = useMemo(() => {
         const entriesByDate: Record<string, ScheduleEntry[]> = {};
-        
+
         entries.forEach(entry => {
             const dateStr = entry.date.split("T")[0];
             if (!entriesByDate[dateStr]) entriesByDate[dateStr] = [];
@@ -100,9 +233,9 @@ export default function GlobalSchedulesPage() {
                 assigned.forEach(entry => {
                     const timeStart = entry.shift?.startTime?.split("T")[1] || "00:00:00Z";
                     const timeEnd = entry.shift?.endTime?.split("T")[1] || "23:59:59Z";
-                    
-                    const baseColor = entry.isEmergencyCoverage 
-                        ? "#dc2626" 
+
+                    const baseColor = entry.isEmergencyCoverage
+                        ? "#dc2626"
                         : (entry.shift?.color && entry.shift.color !== "#f3f4f6" ? entry.shift.color : "#2563eb");
 
                     events.push({
@@ -123,7 +256,7 @@ export default function GlobalSchedulesPage() {
                         title: `➕ ${vacantCount} Vacantes`,
                         start: dateStr,
                         allDay: true,
-                        backgroundColor: "#fee2e2", 
+                        backgroundColor: "#fee2e2",
                         textColor: "#991b1b",
                         borderColor: "#fca5a5",
                         extendedProps: { type: "vacant_summary", dateStr }
@@ -157,7 +290,7 @@ export default function GlobalSchedulesPage() {
 
     const openManagementModal = (date: Date, singleId: string | null = null) => {
         setSelectedDateForCreation(date);
-        setSelectedSingleEntryId(singleId); // Asignamos si viene de un slot específico o no
+        setSelectedSingleEntryId(singleId);
         fetchShiftsForDay(date, selectedDepartment);
         setIsCreateModalOpen(true);
     };
@@ -168,6 +301,7 @@ export default function GlobalSchedulesPage() {
         setSelectedSingleEntryId(null);
     };
 
+
     return (
         <div className="p-6 bg-slate-50 min-h-screen transition-all">
             {/* ENCABEZADO Y CONTROLES */}
@@ -176,7 +310,7 @@ export default function GlobalSchedulesPage() {
                     <h1 className="text-2xl font-bold text-slate-900 tracking-tight">📅 Calendario Global de Turnos</h1>
                     <p className="text-sm text-slate-500">Gestión de coberturas y asignaciones de enfermería.</p>
                 </div>
-                
+
                 <div className="flex flex-wrap items-center gap-3">
                     {viewMode === "summary" && (
                         <button
@@ -203,10 +337,74 @@ export default function GlobalSchedulesPage() {
                 </div>
             </div>
 
+
+
+
+
+
+            <div className={`mb-6 p-4 rounded-2xl border flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm ${scheduleState.status === "DRAFT" ? "bg-amber-50/60 border-amber-200" : "bg-emerald-50/60 border-emerald-200"
+                }`}>
+
+
+                {(() => {
+                    // Obtenemos la configuración del estado actual o un fallback por defecto si es provisional (ej: EMPTY)
+                    const currentStatus = scheduleState.status as keyof typeof SCHEDULE_STATUS_CONFIG;
+                    const config = SCHEDULE_STATUS_CONFIG[currentStatus] || {
+                        label: scheduleState.status || "Sin Definir",
+                        icon: "📅",
+                        bgIcon: "bg-slate-100 text-slate-600",
+                        bgTag: "bg-slate-200 text-slate-700",
+                        pulse: false,
+                    };
+
+                    return (
+                        <div className="flex items-center gap-3">
+                            {/* Icono contenedor con color dinámico */}
+                            <div className={`p-2.5 rounded-xl transition-all ${config.bgIcon}`}>
+                                {config.icon}
+                            </div>
+
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <h3 className="text-sm font-bold text-slate-800">Estado del Horario Actual:</h3>
+                                    {/* Badge estilizado con soporte de pulsación por software (Ej: GENERATING) */}
+                                    <span className={`text-[11px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider transition-all ${config.bgTag
+                                        } ${config.pulse ? "animate-pulse" : ""}`}>
+                                        {config.label}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })()}
+
+                {/* 🟢 BOTONERA ACTUALIZADA PARA REACCIONAR ABRIENDO MODALES */}
+                <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+                    {scheduleState.status === "DRAFT" && (
+                        <button
+                            onClick={() => setIsPublishModalOpen(true)} // 🟢 Abre el modal de configuración de publicación
+                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all"
+                        >
+                            📢 Publicar Horario...
+                        </button>
+                    )}
+
+                    <button
+                        onClick={() => setIsGenerateModalOpen(true)} // 🟢 Abre el panel de selección de mes/año para el Engine
+                        className="px-4 py-2 bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 text-xs font-bold rounded-xl transition-all"
+                    >
+                        🔄 Volver a Generar (Engine)...
+                    </button>
+                </div>
+            </div>
+
+
             {/* CALENDARIO */}
             <div className="bg-gray-50 p-6 rounded-2xl shadow-sm border border-slate-200 relative overflow-hidden">
                 <div className="fullcalendar-wrapper global-schedules-theme">
                     <FullCalendar
+                        // 🟢 ESTO FUERZA AL CALENDARIO A VOLVER A RENDERIZARSE SI LOS TURNOS CAMBIAN
+                        key={calendarEvents.length + (selectedDepartment || "")}
                         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
                         initialView="dayGridMonth"
                         locales={[esLocale]}
@@ -226,10 +424,19 @@ export default function GlobalSchedulesPage() {
                             }
                         }}
 
-                        datesSet={(arg) => setDateRange({ startDate: arg.startStr, endDate: arg.endStr })}
-
+                        datesSet={(arg) => {
+                            if (
+                                lastProcessedRange.current?.start === arg.startStr &&
+                                lastProcessedRange.current?.end === arg.endStr
+                            ) {
+                                return;
+                            }
+                            lastProcessedRange.current = { start: arg.startStr, end: arg.endStr };
+                            setDateRange({ startDate: arg.startStr, endDate: arg.endStr });
+                        }}
                         eventContent={(arg) => {
                             const isSummaryBadge = arg.event.extendedProps.type === "vacant_summary";
+
                             if (isSummaryBadge) {
                                 return (
                                     <div className="w-full text-center py-0.5 px-1.5 rounded-md font-bold text-[10px] border border-red-200/60 shadow-sm transition-all bg-red-50 text-red-800 cursor-pointer">
@@ -237,20 +444,59 @@ export default function GlobalSchedulesPage() {
                                     </div>
                                 );
                             }
+
+                            const entry = arg.event.extendedProps.entry;
+                            const departmentName = entry?.shiftTemplate?.department?.name || "Gral";
+
+                            const formatTimeStr = (isoString?: string | null) => {
+                                if (!isoString) return "--:--";
+                                if (!isoString.includes("T")) return isoString.substring(0, 5);
+                                const timePart = isoString.split("T")[1];
+                                return timePart ? timePart.substring(0, 5) : "--:--";
+                            };
+
+                            const startTime = formatTimeStr(entry?.shift?.startTime);
+                            const endTime = formatTimeStr(entry?.shift?.endTime);
+
                             return (
-                                <div className="p-1 overflow-hidden flex flex-col w-full text-black font-medium">
-                                    <span className="text-[9px] font-bold opacity-95 leading-none">{arg.timeText}</span>
-                                    <span className="text-xs font-bold truncate leading-tight mt-0.5 drop-shadow-sm">
+                                <div className="p-1 overflow-hidden flex flex-col w-full text-black font-medium leading-tight">
+                                    <span className="text-xs font-bold truncate drop-shadow-sm">
                                         {arg.event.title}
+                                    </span>
+                                    <span className="text-[10px] font-semibold opacity-90 mt-0.5 tracking-wide flex items-center gap-1 bg-black/10 px-1 py-0.5 rounded sm:inline-block truncate">
+                                        🏥 [{departmentName}] {startTime} - {endTime}
                                     </span>
                                 </div>
                             );
                         }}
+                        // dateClick={(info) => openManagementModal(info.date)}
 
-                        dateClick={(info) => openManagementModal(info.date)}
+                        dateClick={(info) => {
+                            // 1. Corregimos el desajuste de zona horaria de la celda clickeada
+                            const clickDateStr = info.dateStr; // Ej: "2026-06-02"
 
-                        eventDrop={async (info) => {
-                            try { await updateEntry({ id: info.event.id, date: info.event.startStr }); } catch { info.revert(); }
+                            // 2. Buscamos si ya existe una vacante física (registro sin enfermera asignada) en las entries de este día
+                            const existingVacantEntry = entries.find(e => {
+                                const entryDateStr = e.date.split("T")[0];
+                                const isSameDate = entryDateStr === clickDateStr;
+                                const isVacant = !e.nurseId || !e.nurse;
+
+                                // Si tienes filtro por departamento, asegúrate de que coincida
+                                let isSameDept = true;
+                                if (selectedDepartment) {
+                                    const entryDeptId = (e.shiftTemplate as any)?.departmentId || (e.shift as any)?.departmentId;
+                                    isSameDept = entryDeptId === selectedDepartment;
+                                }
+
+                                return isSameDate && isVacant && isSameDept;
+                            });
+                            // if (existingVacantEntry) {
+                            //     // 🌟 SI EXISTE: Abrimos el modal en modo EDICIÓN pasando el ID de esa vacante de la BD
+                            //     openManagementModal(info.date, existingVacantEntry.id);
+                            // } else {
+                            //     // ➕ SI NO EXISTE: Flujo de creación masiva normal (Id = null)
+                            //     openManagementModal(info.date, null);
+                            // }
                         }}
                     />
                 </div>
@@ -267,7 +513,6 @@ export default function GlobalSchedulesPage() {
                 }}
                 onSelectEdit={() => {
                     if (decisionTarget) {
-                        // Pasamos la fecha y el ID específico del slot asignado
                         openManagementModal(new Date(decisionTarget.date), decisionTarget.id);
                     }
                     setDecisionTarget(null);
@@ -282,19 +527,177 @@ export default function GlobalSchedulesPage() {
                     isOpen={isCreateModalOpen}
                     onClose={handleCloseMainModal}
                     selectedDate={selectedDateForCreation}
-                    singleEntryId={selectedSingleEntryId} // 🌟 PASAMOS EL FILTRO ÚNICO
-                    existingEntries={entries.filter(e => e.date.startsWith(selectedDateForCreation.toISOString().split('T')[0]))}
+                    singleEntryId={selectedSingleEntryId}
+                    existingEntries={entries.filter(e => {
+                        const offset = selectedDateForCreation.getTimezoneOffset() * 60000;
+                        const localTargetDate = new Date(selectedDateForCreation.getTime() - offset).toISOString().split('T')[0];
+                        const entryDate = e.date.split('T')[0];
+                        const matchesDate = localTargetDate === entryDate;
+
+                        let matchesDept = true;
+                        if (selectedDepartment) {
+                            const entryDeptId = (e.shiftTemplate as any)?.departmentId ||
+                                e.shiftTemplate?.department.id ||
+                                (e.shift as any)?.departmentId;
+                            matchesDept = entryDeptId === selectedDepartment;
+                        }
+
+
+                        return matchesDate && matchesDept;
+                    })}
+                    activeDepartmentId={selectedDepartment}
                     nurses={nurses || []}
-                    shifts={shifts} 
-                    onSave={async (data) => {
-                        console.log("Guardando asignaciones:", data);
-                        handleCloseMainModal();
+                    shifts={shifts || []}
+
+                    // 🌟 SOLUCIÓN AL INCIDENTE: INTERCEPTOR INTELIGENTE DE ENVÍO MÁXIMO
+                    onSave={async (formData) => {
+                        try {
+                            // 🔍 ESCENARIO A: Si estamos editando una sola asignación existente
+                            if (selectedSingleEntryId) {
+                                const currentTargetEntry = entries.find(e => e.id === selectedSingleEntryId);
+                                const resolvedDepartmentId = selectedDepartment ||
+                                    (currentTargetEntry?.shiftTemplate as any)?.departmentId ||
+                                    (currentTargetEntry?.shiftTemplate as any)?.department?.id;
+
+                                if (!resolvedDepartmentId) {
+                                    toast.error("No se pudo determinar el departamento para validar las reglas de la asignación.")
+                                    // alert("No se pudo determinar el departamento para validar las reglas de la asignación.");
+                                    return;
+                                }
+
+                                // Tomamos el primer registro del array de entradas dinámicas que react-hook-form generó para este slot
+                                const singlePayload = formData.entries?.[0];
+                                if (!singlePayload) {
+                                    toast.error("No se encontraron cambios estructurados para actualizar.")
+                                    // alert("No se encontraron cambios estructurados para actualizar.");
+                                    return;
+                                }
+                                // Forzamos el flujo de actualización transaccionado e impactamos logs/alertas operacionales
+                                await inlineUpdateMutation({
+                                    id: selectedSingleEntryId,
+                                    shiftId: singlePayload.shiftId,
+                                    nurseId: singlePayload.nurseId,
+                                    departmentId: resolvedDepartmentId,
+                                });
+
+                                handleCloseMainModal();
+                                return;
+                            }
+
+                            // 🔍 ESCENARIO B: Flujo Normal de Creación Masiva (Bulk)
+                            await createEntries({
+                                date: selectedDateForCreation.toISOString(),
+                                entries: formData.entries,
+                                scheduleId: entries[0].scheduleId
+                            });
+                        } catch (err: any) {
+                            toast.error(`Error operacional: ${err.message}`)
+                            // alert(`Error operacional: ${err.message}`);
+                        }
                     }}
-                    onUpdateEntry={async (id, updatedData) => {
-                        console.log("Modificando entrada inline:", id, updatedData);
+
+                    // Mantenemos este prop activo para cualquier interacción inline dentro del modal
+                    onUpdateEntry={async (entryId, updatedData) => {
+                        try {
+                            const currentTargetEntry = entries.find(e => e.id === entryId);
+                            const resolvedDepartmentId = selectedDepartment ||
+                                (currentTargetEntry?.shiftTemplate as any)?.department?.id;
+
+                            if (!resolvedDepartmentId) {
+                                toast.error("No se pudo determinar el departamento.")
+                                // alert("No se pudo determinar el departamento.");
+                                return;
+                            }
+
+                            await inlineUpdateMutation({
+                                id: entryId,
+                                shiftId: updatedData.shiftId,
+                                nurseId: updatedData.nurseId,
+                                departmentId: resolvedDepartmentId
+                            });
+                        } catch (err: any) {
+                            toast.error(`Error de actualización: ${err.message}`)
+                            // alert(`Error de actualización: ${err.message}`);
+                        }
                     }}
-                />
+
+                    onDeleteEntry={(entryId) => setEntryToDeleteId(entryId)} />
             )}
-        </div>
+
+            {/* 🌟 NUEVO COMPONENTE SHADCN: ALERT DIALOG DE CONFIRMACIÓN */}
+            <AlertDialog open={!!entryToDeleteId} onOpenChange={(open) => !open && setEntryToDeleteId(null)}>
+                <AlertDialogContent className="max-w-md rounded-2xl border border-slate-100 shadow-2xl bg-white">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="text-base font-bold text-slate-900">
+                            ¿Estás absolutamente seguro?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="text-xs text-slate-500 leading-relaxed">
+                            Esta acción eliminará de forma permanente el turno seleccionado en el calendario y desasignará al personal. No se puede deshacer.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="gap-2 mt-4">
+                        <AlertDialogCancel
+                            disabled={isDeletingLoading}
+                            className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-medium transition-colors"
+                        >
+                            Cancelar
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={(e) => {
+                                e.preventDefault(); // Evita que se cierre automáticamente antes de terminar la mutación
+                                handleDeleteConfirm();
+                            }}
+                            disabled={isDeletingLoading}
+                            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold shadow-sm transition-colors disabled:bg-slate-100 disabled:text-slate-400"
+                        >
+                            {isDeletingLoading ? "Eliminando..." : "Sí, eliminar turno"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* 🟢 MODAL 1: OPCIONES AVANZADAS DE PUBLICACIÓN */}
+            <PublishSettingsModal
+                isOpen={isPublishModalOpen}
+                onClose={() => setIsPublishModalOpen(false)}
+                isLoading={isPublishing}
+                onConfirm={async (payloadData) => {
+                    try {
+                        // Construimos el Payload exacto uniendo el scheduleId maestro
+                        await publishSchedule({
+                            scheduleId: scheduleState.id,
+                            ...payloadData
+                        });
+                        toast.success("🚀 ¡Horario consolidado y publicado con éxito!");
+                        setIsPublishModalOpen(false); // Cierra al procesar con éxito
+                    } catch (err: any) {
+                        toast.error(err.message || "Error al intentar publicar el cuadrante.");
+                    }
+                }}
+            />
+
+            {/* 🟢 MODAL 2: CONFIGURACIÓN DE PERIODOS DEL SCHEDULE ENGINE */}
+            <GenerateEngineModal
+                isOpen={isGenerateModalOpen}
+                onClose={() => setIsGenerateModalOpen(false)}
+                isLoading={isGenerating}
+                activeDepartmentName={activeDeptName}
+                onConfirm={async (timePeriod) => {
+                    try {
+                        // Enviamos el departamento activo más el mes/año seleccionado en el DTO
+                        await genrateSchedule({
+                            departmentId: selectedDepartment,
+                            month: timePeriod.month,
+                            year: timePeriod.year
+                        });
+                        toast.success("🤖 Motor ejecutado. El nuevo borrador óptimo ha sido cargado.");
+                        setIsGenerateModalOpen(false);
+                    } catch (err: any) {
+                        toast.error(err.message || "Ocurrió un conflicto al compilar el motor.");
+                    }
+                }}
+            />
+
+        </div >
     );
 }
