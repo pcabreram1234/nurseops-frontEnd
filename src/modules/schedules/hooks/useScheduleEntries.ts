@@ -31,9 +31,15 @@ export interface PublishSchedulePayload {
   createVersionSnapshot?: boolean;
   forcePublish?: boolean;
   validateBeforePublish?: boolean;
-  sendPushNotifications?: boolean;
+  sendPushNotifications?: NotificationValidationObject;
   sendEmails?: boolean;
   publicationNotes?: string;
+}
+
+export interface NotificationValidationObject {
+  publish: boolean
+  sendPushNotifications: boolean
+  sendEmails: boolean
 }
 
 

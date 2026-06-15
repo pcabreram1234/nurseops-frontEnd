@@ -1,32 +1,52 @@
 "use client"
 
 import React from "react";
-// 📝 Componente: PublishSettingsModal
+import { PublishSchedulePayload, NotificationValidationObject } from "../hooks/useScheduleEntries";
+
 interface PublishModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onConfirm: (payload: {
-        notifyStaff: boolean;
-        createVersionSnapshot: boolean;
-        forcePublish: boolean;
-        validateBeforePublish: boolean;
-        sendPushNotifications: boolean;
-        sendEmails: boolean;
-        publicationNotes: string;
-    }) => void;
+    // Recibe el payload omitiendo el scheduleId ya que este lo inyecta la vista padre (page.tsx)
+    onConfirm: (payload: Omit<PublishSchedulePayload, "scheduleId">) => void;
     isLoading: boolean;
 }
 
 export const PublishSettingsModal: React.FC<PublishModalProps> = ({ isOpen, onClose, onConfirm, isLoading }) => {
+    // 1. Estados base de publicación y snapshot
     const [notifyStaff, setNotifyStaff] = React.useState(true);
     const [createSnapshot, setCreateSnapshot] = React.useState(true);
-    const [validate, setValidate] = React.useState(true);
-    const [force, setForce] = React.useState(false);
+    const [forcePublish, setForcePublish] = React.useState(false);
+
+    // 2. Estados internos para construir el objeto compuesto 'validateBeforePublish'
+    const [validatePublish, setValidatePublish] = React.useState(true);
+    const [validatePushNotifications, setValidatePushNotifications] = React.useState(true);
+    const [validateEmails, setValidateEmails] = React.useState(true);
+
+    // 3. Canales inmediatos de distribución de alertas
     const [sendPush, setSendPush] = React.useState(true);
     const [sendMail, setSendMail] = React.useState(true);
     const [notes, setNotes] = React.useState("");
 
     if (!isOpen) return null;
+
+    const handleConfirmClick = () => {
+        // 🟢 CONSTRUCCIÓN DEL OBJETO COMPUESTO EXIGIDO POR TU NUEVA INTERFAZ
+        const validationObject: NotificationValidationObject = {
+            publish: validatePublish,
+            sendPushNotifications: validatePushNotifications,
+            sendEmails: validateEmails
+        };
+
+        onConfirm({
+            notifyStaff,
+            createVersionSnapshot: createSnapshot,
+            forcePublish, // Ahora vuelve a ser un booleano simple 👍
+            validateBeforePublish: validatePublish, // 👈 Inyectamos el objeto compuesto aquí
+            sendPushNotifications: validationObject,
+            sendEmails: sendMail,
+            publicationNotes: notes || undefined // Evita enviar strings vacíos
+        });
+    };
 
     return (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-fade-in">
@@ -37,14 +57,27 @@ export const PublishSettingsModal: React.FC<PublishModalProps> = ({ isOpen, onCl
                 </div>
 
                 <div className="p-5 space-y-4 max-h-[60vh] overflow-y-auto">
-                    <label className="flex items-start gap-3 p-2.5 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors">
-                        <input type="checkbox" checked={validate} onChange={(e) => setValidate(e.target.checked)} className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
-                        <div>
-                            <span className="text-xs font-bold text-slate-800 block">Validar antes de publicar</span>
-                            <span className="text-[11px] text-slate-500">Ejecuta el escáner clínico de fatiga, descansos mínimos y cupos vacíos.</span>
-                        </div>
-                    </label>
+                    {/* Sección: Validación antes de Publicar (Agrupación de Checkboxes) */}
+                    <div className="p-3 border border-slate-100 bg-slate-50/50 rounded-xl space-y-2">
+                        <span className="text-xs font-bold text-slate-800 block">🛡️ Control de Validación Previa</span>
+                        
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" checked={validatePublish} onChange={(e) => setValidatePublish(e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+                            <span className="text-[11px] text-slate-600 font-medium">Validar reglas de negocio del cuadrante al publicar</span>
+                        </label>
+                        
+                        {/* <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" checked={validatePushNotifications} onChange={(e) => setValidatePushNotifications(e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+                            <span className="text-[11px] text-slate-600 font-medium">Validar estado de tokens y Push antes del envío</span>
+                        </label>
+                        
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" checked={validateEmails} onChange={(e) => setValidateEmails(e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+                            <span className="text-[11px] text-slate-600 font-medium">Validar buzones de correo institucionales</span>
+                        </label> */}
+                    </div>
 
+                    {/* Snapshot */}
                     <label className="flex items-start gap-3 p-2.5 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors">
                         <input type="checkbox" checked={createSnapshot} onChange={(e) => setCreateSnapshot(e.target.checked)} className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
                         <div>
@@ -53,6 +86,7 @@ export const PublishSettingsModal: React.FC<PublishModalProps> = ({ isOpen, onCl
                         </div>
                     </label>
 
+                    {/* Notificaciones */}
                     <label className="flex items-start gap-3 p-2.5 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors">
                         <input type="checkbox" checked={notifyStaff} onChange={(e) => { setNotifyStaff(e.target.checked); if (!e.target.checked) { setSendPush(false); setSendMail(false); } else { setSendPush(true); setSendMail(true); } }} className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
                         <div>
@@ -74,14 +108,16 @@ export const PublishSettingsModal: React.FC<PublishModalProps> = ({ isOpen, onCl
                         </div>
                     )}
 
-                    <label className="flex items-start gap-3 p-2.5 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors border border-amber-100 bg-amber-50/30">
-                        <input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} className="mt-1 h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500" />
+                    {/* Forzar Publicación Simple */}
+                    <label className="flex items-start gap-3 p-2.5 hover:bg-amber-50/50 rounded-xl cursor-pointer transition-colors border border-amber-100 bg-amber-50/20">
+                        <input type="checkbox" checked={forcePublish} onChange={(e) => setForcePublish(e.target.checked)} className="mt-1 h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500" />
                         <div>
                             <span className="text-xs font-bold text-amber-900 block">Forzar publicación (Ignorar advertencias)</span>
-                            <span className="text-[11px] text-amber-700/80">Fuerza la aprobación aun si existen advertencias menores de asignación.</span>
+                            <span className="text-[11px] text-amber-700/80">Fuerza la aprobación oficial aun si existen advertencias menores de descanso o fatiga.</span>
                         </div>
                     </label>
 
+                    {/* Notas circulares */}
                     <div className="space-y-1.5 p-1">
                         <span className="text-xs font-bold text-slate-700 block">Notas o circulares del periodo</span>
                         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Ej: Periodo de alta demanda invernal, refuerzos médicos activos..." className="w-full text-xs p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 min-h-[60px]" />
@@ -93,15 +129,7 @@ export const PublishSettingsModal: React.FC<PublishModalProps> = ({ isOpen, onCl
                     <button
                         type="button"
                         disabled={isLoading}
-                        onClick={() => onConfirm({
-                            notifyStaff,
-                            createVersionSnapshot: createSnapshot,
-                            forcePublish: force,
-                            validateBeforePublish: validate,
-                            sendPushNotifications: sendPush,
-                            sendEmails: sendMail,
-                            publicationNotes: notes
-                        })}
+                        onClick={handleConfirmClick}
                         className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-colors disabled:opacity-50"
                     >
                         {isLoading ? "Publicando..." : "🚀 Confirmar Publicación"}
