@@ -1,18 +1,31 @@
 import { apiInstance } from "@/services/axios";
-import { Nurse, NurseFormData } from "../types";
+import { Nurse, NurseFormData, NurseFilters, PaginatedNurses } from "../types";
 
 const API_URL = "/nurses";
 
 export const nurseService = {
-    getAll: async (): Promise<Nurse[]> => {
-        const response = await apiInstance.get<Nurse[]>(API_URL);
-        return response.data;
+    getAll: async (filters?: NurseFilters): Promise<PaginatedNurses> => {
+        const params = new URLSearchParams();
+        if (filters?.search) params.append("search", filters.search);
+        if (filters?.status) params.append("status", filters.status);
+        if (filters?.departmentId) params.append("departmentId", filters.departmentId);
+        if (filters?.branchId) params.append("branchId", filters.branchId);
+        if (filters?.contractType) params.append("contractType", filters.contractType);
+        if (filters?.page) params.append("page", String(filters.page));
+        if (filters?.limit) params.append("limit", String(filters.limit));
+        const response = await apiInstance.get(API_URL, { params });
+        const data = (response as any)?.data || response;
+        if (Array.isArray(data)) {
+            return { data, meta: (response as any)?.meta || { total: data.length, page: filters?.page ?? 1, limit: filters?.limit ?? 10, totalPages: Math.ceil(data.length / (filters?.limit ?? 10)) } };
+        }
+        return data as PaginatedNurses;
     },
 
     create: async (data: any): Promise<Nurse> => {
         const nursePayload = {
             userId: data.userId,
             departmentId: data.departmentId,
+            branchId: data.branchId || null,
             specialityId: data.specialityId || null,
             organizationId: data.organizationId,
             contract_type: data.contract_type,
@@ -65,6 +78,7 @@ export const nurseService = {
         const nursePayload = {
             userId: data.userId,
             departmentId: data.departmentId,
+            branchId: data.branchId || null,
             specialityId: data.specialityId || null,
             organizationId: data.organizationId,
             contract_type: data.contract_type,

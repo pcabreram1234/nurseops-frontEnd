@@ -6,6 +6,8 @@ export interface UsersQueryParams {
     limit?: number;
     search?: string;
     status?: string;
+    departmentId?: string;
+    branchId?: string;
 }
 
 export interface PaginatedUsersResponse {

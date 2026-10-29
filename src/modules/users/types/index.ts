@@ -5,6 +5,7 @@ export interface User {
     lastName: string;
     organizationId: string | null;
     departmentId: string | null;
+    branchId?: string | null;
     rolesId: string | null;
     status: 'ACTIVE' | 'INACTIVE' | 'VACATION' | 'LICENSE' | 'SUSPENDED'; // Mapeado a tu NurseStatusType
     lastLoginAt: string;
@@ -12,10 +13,11 @@ export interface User {
     // Relaciones opcionales para renderizar en la tabla
     organization?: { name: string } | null;
     department?: { name: string } | null;
+    branch?: { id: string; name: string } | null;
     roles?: { name: string } | null;
 }
 
 // Datos necesarios para los formularios
-export type UserFormData = Omit<User, 'id' | 'lastLoginAt' | 'createdAt' | 'organization' | 'department' | 'roles'> & {
+export type UserFormData = Omit<User, 'id' | 'lastLoginAt' | 'createdAt' | 'organization' | 'department' | 'branch' | 'roles'> & {
     password?: string; // Opcional en edición, obligatorio al crear
 };

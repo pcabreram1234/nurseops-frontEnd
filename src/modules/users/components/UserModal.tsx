@@ -17,11 +17,12 @@ interface Props {
     isSubmitting: boolean;
     // Datos requeridos para alimentar las relaciones del formulario:
     organizations: { id: string; name: string }[];
-    departments: { id: string; name: string }[];
+    departments: { id: string; name: string; organizationId?: string; branchId?: string | null }[];
+    branches: { id: string; name: string; organizationId: string }[];
     roles: { id: string; name: string }[];
 }
 
-export default function UserModal({ isOpen, onClose, onSubmit, user, isSubmitting, organizations, departments, roles }: Props) {
+export default function UserModal({ isOpen, onClose, onSubmit, user, isSubmitting, organizations, departments, branches, roles }: Props) {
     const { register, handleSubmit, reset, setValue, watch } = useForm<UserFormData>({
         defaultValues: {
             email: "",
@@ -30,6 +31,7 @@ export default function UserModal({ isOpen, onClose, onSubmit, user, isSubmittin
             lastName: "",
             organizationId: "",
             departmentId: "",
+            branchId: "",
             rolesId: null,
             status: "ACTIVE"
         }
@@ -38,12 +40,17 @@ export default function UserModal({ isOpen, onClose, onSubmit, user, isSubmittin
     const statusValue = watch("status");
     const orgValue = watch("organizationId") || undefined;
     const deptValue = watch("departmentId") || undefined;
+    const branchValue = watch("branchId") || undefined;
     const roleValue = watch("rolesId") || undefined;
 
     // 🌟 MAPEO DINÁMICO: Buscamos el objeto correspondiente para extraer el 'name'
     const currentOrgName = organizations.find(o => o.id === orgValue)?.name;
     const currentDeptName = departments.find(d => d.id === deptValue)?.name;
+    const currentBranchName = branches.find(b => b.id === branchValue)?.name;
     const currentRoleName = roles.find(r => r.id === roleValue)?.name;
+
+    // Solo se ofrecen sedes de la organización seleccionada.
+    const branchOptions = branches.filter(b => !orgValue || b.organizationId === orgValue);
 
     useEffect(() => {
         if (user) {
@@ -54,6 +61,7 @@ export default function UserModal({ isOpen, onClose, onSubmit, user, isSubmittin
                 lastName: user.lastName,
                 organizationId: user.organizationId,
                 departmentId: user.departmentId,
+                branchId: user.branchId || "",
                 rolesId: user.rolesId,
                 status: user.status,
             });
@@ -65,6 +73,7 @@ export default function UserModal({ isOpen, onClose, onSubmit, user, isSubmittin
                 lastName: "",
                 organizationId: organizations[0]?.id || null,
                 departmentId: departments[0]?.id || null,
+                branchId: departments[0]?.branchId || "",
                 rolesId: roles[0]?.id || null,
                 status: "ACTIVE"
             });
@@ -117,10 +126,15 @@ export default function UserModal({ isOpen, onClose, onSubmit, user, isSubmittin
                         <Input id="password" type="password" {...register("password", { required: !user })} />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div className="space-y-1">
                             <Label>Organización</Label>
-                            <Select value={orgValue} onValueChange={(value) => setValue("organizationId", value)}>
+                            <Select value={orgValue} onValueChange={(value) => {
+                                setValue("organizationId", value);
+                                setValue("departmentId", "");
+                                const nextBranch = branches.find(b => b.organizationId === value);
+                                setValue("branchId", nextBranch?.id || "");
+                            }}>
                                 <SelectTrigger>
                                     {/* 🌟 Si existe el nombre mapeado lo renderiza, de lo contrario muestra el placeholder */}
                                     <SelectValue placeholder="Seleccionar">{currentOrgName}</SelectValue>
@@ -133,13 +147,31 @@ export default function UserModal({ isOpen, onClose, onSubmit, user, isSubmittin
 
                         <div className="space-y-1">
                             <Label>Departamento</Label>
-                            <Select value={deptValue} onValueChange={(value) => setValue("departmentId", value)}>
+                            <Select value={deptValue} onValueChange={(value) => {
+                                setValue("departmentId", value);
+                                const selected = departments.find(d => d.id === value);
+                                if (selected?.branchId) {
+                                    setValue("branchId", selected.branchId);
+                                }
+                            }}>
                                 <SelectTrigger>
                                     {/* 🌟 Si existe el nombre mapeado lo renderiza, de lo contrario muestra el placeholder */}
                                     <SelectValue placeholder="Seleccionar">{currentDeptName}</SelectValue>
                                 </SelectTrigger>
                                 <SelectContent>
                                     {departments.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="space-y-1">
+                            <Label>Sede</Label>
+                            <Select value={branchValue} onValueChange={(value) => setValue("branchId", value)}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Seleccionar">{currentBranchName || "Sin sede"}</SelectValue>
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {branchOptions.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
                                 </SelectContent>
                             </Select>
                         </div>

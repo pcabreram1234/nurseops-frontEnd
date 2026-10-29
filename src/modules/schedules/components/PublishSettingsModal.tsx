@@ -62,7 +62,7 @@ export const PublishSettingsModal: React.FC<PublishModalProps> = ({ isOpen, onCl
                         <span className="text-xs font-bold text-slate-800 block">🛡️ Control de Validación Previa</span>
                         
                         <label className="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" checked={validatePublish} onChange={(e) => setValidatePublish(e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+                            <input type="checkbox" checked={validatePublish} onChange={(e) => { setValidatePublish(e.target.checked); if (e.target.checked) setForcePublish(false); }} className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
                             <span className="text-[11px] text-slate-600 font-medium">Validar reglas de negocio del cuadrante al publicar</span>
                         </label>
                         
@@ -110,7 +110,7 @@ export const PublishSettingsModal: React.FC<PublishModalProps> = ({ isOpen, onCl
 
                     {/* Forzar Publicación Simple */}
                     <label className="flex items-start gap-3 p-2.5 hover:bg-amber-50/50 rounded-xl cursor-pointer transition-colors border border-amber-100 bg-amber-50/20">
-                        <input type="checkbox" checked={forcePublish} onChange={(e) => setForcePublish(e.target.checked)} className="mt-1 h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500" />
+                        <input type="checkbox" checked={forcePublish} onChange={(e) => { setForcePublish(e.target.checked); if (e.target.checked) setValidatePublish(false); }} className="mt-1 h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500" />
                         <div>
                             <span className="text-xs font-bold text-amber-900 block">Forzar publicación (Ignorar advertencias)</span>
                             <span className="text-[11px] text-amber-700/80">Fuerza la aprobación oficial aun si existen advertencias menores de descanso o fatiga.</span>
@@ -125,12 +125,12 @@ export const PublishSettingsModal: React.FC<PublishModalProps> = ({ isOpen, onCl
                 </div>
 
                 <div className="p-4 border-t border-slate-100 flex justify-end gap-2 bg-slate-50/50">
-                    <button type="button" onClick={onClose} disabled={isLoading} className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl text-xs font-medium transition-colors">Cancelar</button>
+                    <button type="button" onClick={onClose} disabled={isLoading} className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl text-xs font-medium transition-colors cursor-pointer">Cancelar</button>
                     <button
                         type="button"
                         disabled={isLoading}
                         onClick={handleConfirmClick}
-                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-colors disabled:opacity-50"
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-colors disabled:opacity-50 cursor-pointer"
                     >
                         {isLoading ? "Publicando..." : "🚀 Confirmar Publicación"}
                     </button>

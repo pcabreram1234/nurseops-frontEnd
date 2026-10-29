@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { scheduleService } from "../services/scheduleService"; // 🌟 Importamos tu servicio
 import { schedulePublicationService } from "../services/schedulePublicationService";
 import { GenerateSchedulePayload } from "../services/scheduleService";
+import { SCHEDULE_CALENDAR_KEY } from "./useGlobalCalendar";
 import { toast } from "sonner"
 
 interface UpdateEntryPayload {
@@ -59,9 +60,7 @@ export const useScheduleEntries = () => {
       }
     },
     onSuccess: () => {
-      // 🔄 Limpieza total de historial y caché para forzar redibujado instantáneo
-      queryClient.resetQueries({ queryKey: ["global-calendar"] });
-      queryClient.invalidateQueries({ queryKey: ["global-calendar"] });
+      queryClient.invalidateQueries({ queryKey: [SCHEDULE_CALENDAR_KEY] });
       toast.success("Turno actualizado")
     },
   });
@@ -80,9 +79,7 @@ export const useScheduleEntries = () => {
       }
     },
     onSuccess: () => {
-      // 🔄 Resetea el historial del calendario para pintar los múltiples enfermeros agregados
-      queryClient.resetQueries({ queryKey: ["global-calendar"] });
-      queryClient.invalidateQueries({ queryKey: ["global-calendar"] });
+      queryClient.invalidateQueries({ queryKey: [SCHEDULE_CALENDAR_KEY] });
       toast.success("Turnos registrados")
     },
   });
@@ -100,9 +97,7 @@ export const useScheduleEntries = () => {
       }
     },
     onSuccess: () => {
-      // 🔄 Remueve el cuadro del FullCalendar de inmediato al limpiar la caché vieja
-      queryClient.resetQueries({ queryKey: ["global-calendar"] });
-      queryClient.invalidateQueries({ queryKey: ["global-calendar"] });
+      queryClient.invalidateQueries({ queryKey: [SCHEDULE_CALENDAR_KEY] });
       toast.success("Turno eliminado")
     },
   });
@@ -122,9 +117,9 @@ export const useScheduleEntries = () => {
       }
     },
     onSuccess: () => {
-      // 🔄 Reseteamos las consultas del calendario global para que los estados cambien de DRAFT a PUBLISHED en la UI
-      queryClient.resetQueries({ queryKey: ["global-calendar"] });
-      queryClient.invalidateQueries({ queryKey: ["global-calendar"] });
+      // Invalidamos el calendario para que se refresque el estado del schedule
+      queryClient.invalidateQueries({ queryKey: [SCHEDULE_CALENDAR_KEY] });
+      toast.success("Horario publicado exitosamente");
     },
   });
 
@@ -143,7 +138,7 @@ export const useScheduleEntries = () => {
     onSuccess: (data) => {
       toast.success(data.message || "Borrador generado con éxito.");
       // Refresca el calendario global instantáneamente para pintar el nuevo borrador simulado
-      queryClient.invalidateQueries({ queryKey: ["global-calendar"] });
+      queryClient.invalidateQueries({ queryKey: [SCHEDULE_CALENDAR_KEY] });
     },
     onError: (error: any) => {
       toast.error(error.message);

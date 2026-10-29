@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { format, isSameDay, formatDate } from "date-fns";
 import { es } from "date-fns/locale";
@@ -150,19 +150,33 @@ export const ScheduleEntryModal: React.FC<Props> = ({
         }
     };
 
+    // 🚀 DEBOUNCE: Ref para controlar el timer de validación y evitar requests innecesarios
+    const validationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
     // Disparar validaciones automáticas para las filas creadas dinámicamente en el formulario masivo
+    // 🚀 DEBOUNCE de 400ms: Evita inundar el backend con requests en cada cambio de dropdown
     useEffect(() => {
         if (isSingleEditMode || !watchedEntries) return;
 
-        watchedEntries.forEach((entry, index) => {
-            if (entry.nurseId && entry.shiftId) {
-                // Evitamos ciclos infinitos validando solo si no está cargando o si cambiaron los IDs
-                const currentVal = validationMap[`new -${index}`];
-                if (!currentVal || (!currentVal.isLoading && !currentVal.errors.length && !currentVal.warnings.length)) {
-                    executeLiveValidation(`new -${index}`, entry.nurseId, entry.shiftId);
+        // Cancelar timer anterior si existe
+        if (validationTimerRef.current) {
+            clearTimeout(validationTimerRef.current);
+        }
+
+        validationTimerRef.current = setTimeout(() => {
+            watchedEntries.forEach((entry, index) => {
+                if (entry.nurseId && entry.shiftId) {
+                    const currentVal = validationMap[`new -${index}`];
+                    if (!currentVal || (!currentVal.isLoading && !currentVal.errors.length && !currentVal.warnings.length)) {
+                        executeLiveValidation(`new -${index}`, entry.nurseId, entry.shiftId);
+                    }
                 }
-            }
-        });
+            });
+        }, 400);
+
+        return () => {
+            if (validationTimerRef.current) clearTimeout(validationTimerRef.current);
+        };
     }, [watchedEntries, isSingleEditMode]);
 
     const formatTime = (isoString?: string | null) => {
@@ -195,7 +209,7 @@ export const ScheduleEntryModal: React.FC<Props> = ({
 
     const filterShiftsForBulk = useMemo(() => {
         return shifts.filter((f) => formatDate(f.startTime, 'dd-MM-yyyy') === formatDate(selectedDate, "dd-MM-yyyy"))
-    }, [])
+    }, [shifts, selectedDate])
 
     // Identificar departamento activo contextual
     const currentActiveDepartmentId = useMemo(() => {
@@ -312,11 +326,6 @@ export const ScheduleEntryModal: React.FC<Props> = ({
     };
 
     if (!isOpen) return null;
-
-
-
-    console.log(filterShiftsForBulk)
-
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">

@@ -4,15 +4,31 @@ import React from "react";
 interface GenerateModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onConfirm: (payload: { month: number; year: number }) => void;
+    onConfirm: (payload: { month: number; year: number; branchId?: string }) => void;
     isLoading: boolean;
     activeDepartmentName: string;
+    branches?: { id: string; name: string; isPrimary?: boolean }[];
+    defaultBranchId?: string;
 }
 
-export const GenerateEngineModal: React.FC<GenerateModalProps> = ({ isOpen, onClose, onConfirm, isLoading, activeDepartmentName }) => {
+export const GenerateEngineModal: React.FC<GenerateModalProps> = ({
+    isOpen,
+    onClose,
+    onConfirm,
+    isLoading,
+    activeDepartmentName,
+    branches = [],
+    defaultBranchId,
+}) => {
     const currentYear = new Date().getFullYear();
     const [month, setMonth] = React.useState(new Date().getMonth() + 1);
     const [year, setYear] = React.useState(currentYear);
+    const [branchId, setBranchId] = React.useState(defaultBranchId || "");
+
+    React.useEffect(() => {
+        if (!isOpen) return;
+        setBranchId(defaultBranchId || branches[0]?.id || "");
+    }, [isOpen, defaultBranchId, branches]);
 
     if (!isOpen) return null;
 
@@ -35,6 +51,23 @@ export const GenerateEngineModal: React.FC<GenerateModalProps> = ({ isOpen, onCl
                         <span className="text-[11px] uppercase tracking-wider text-blue-700 font-extrabold block">Departamento Objetivo</span>
                         <span className="text-xs font-bold text-slate-800 mt-0.5 block">📍 {activeDepartmentName || "Ninguno Seleccionado"}</span>
                     </div>
+
+                    {branches.length > 0 && (
+                        <div className="space-y-1">
+                            <label className="text-[11px] font-bold text-slate-600">Sede a planificar</label>
+                            <select
+                                value={branchId}
+                                onChange={(e) => setBranchId(e.target.value)}
+                                className="w-full text-xs p-2.5 border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-900 outline-none"
+                            >
+                                {branches.map((branch) => (
+                                    <option key={branch.id} value={branch.id}>
+                                        {branch.name}{branch.isPrimary ? " (principal)" : ""}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
 
                     <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1">
@@ -63,7 +96,7 @@ export const GenerateEngineModal: React.FC<GenerateModalProps> = ({ isOpen, onCl
                     <button
                         type="button"
                         disabled={isLoading}
-                        onClick={() => onConfirm({ month, year })}
+                        onClick={() => onConfirm({ month, year, branchId: branchId || undefined })}
                         className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition-colors disabled:opacity-50"
                     >
                         {isLoading ? "Calculando Cuadrante..." : "🤖 Lanzar Simulación"}

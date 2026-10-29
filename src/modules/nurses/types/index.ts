@@ -38,6 +38,7 @@ export interface NurseRestrictionFormInput {
 export interface NurseFormData {
     userId: string;
     departmentId: string;
+    branchId?: string | null;
     specialityId?: string | null;
     organizationId: string;
     contract_type: ContracTypeList | string;
@@ -69,6 +70,7 @@ export interface Nurse {
     id: string;
     userId: string;
     departmentId: string;
+    branchId?: string | null;
     organizationId: string;
     contract_type: string;
     hire_date: string;
@@ -81,6 +83,7 @@ export interface Nurse {
         email: string;
     };
     department?: { id: string; name: string };
+    branch?: { id: string; name: string } | null;
     speciality?: { id: string; name: string };
     nurseProfiles?: {
         id: string;
@@ -135,6 +138,7 @@ export interface NurseRestrictionType {
 export interface NurseFormInputs {
     userId: string;
     departmentId: string;
+    branchId?: string;
     specialityId?: string;
     organizationId: string;
     contract_type: string;
@@ -150,4 +154,20 @@ export interface NurseFormInputs {
 
     // 🌟 CAMBIO CRÍTICO: Ahora es un arreglo dinámico controlado por useFieldArray
     restrictions: NurseRestrictionFormInput[];
+}
+
+// Pagination and Filters
+export interface NurseFilters {
+    search?: string;
+    status?: NurseStatusType;
+    departmentId?: string;
+    branchId?: string;
+    contractType?: ContracTypeList;
+    page?: number;
+    limit?: number;
+}
+
+export interface PaginatedNurses {
+    data: Nurse[];
+    meta: { total: number; page: number; limit: number; totalPages: number };
 }

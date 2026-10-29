@@ -1,37 +1,62 @@
 // @/modules/schedules/hooks/useGlobalCalendar.ts
 import { useState } from "react";
-import { useQuery, useQueryClient, } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { scheduleService } from "../services/scheduleService";
 
+/**
+ * Query key compartida para el calendario global de schedules.
+ * Las mutaciones deben invalidar esta key para refrescar los datos.
+ */
+export const SCHEDULE_CALENDAR_KEY = "schedule-calendar" as const;
+
 export const useGlobalCalendar = () => {
-    const queryClient = useQueryClient();
-    // Almacenamos el rango de fechas actual que FullCalendar está mostrando en pantalla
     const [dateRange, setDateRange] = useState({ startDate: "", endDate: "" });
     const [selectedDepartment, setSelectedDepartment] = useState<string>("");
+    const [selectedBranch, setSelectedBranch] = useState<string>("");
 
-    // Query para los turnos asignados
-    const { data: entries = [], isLoading: isLoadingEntries, isFetching } = useQuery({
-        queryKey: ["global-calendar", dateRange.startDate, dateRange.endDate, selectedDepartment],
-        queryFn: () => scheduleService.getEntriesByDateRange(dateRange.startDate, dateRange.endDate, selectedDepartment),
-        // Solo ejecutamos si tenemos un rango de fecha válido (FullCalendar lo seteará al montar)
-        enabled: !!dateRange.startDate && !!dateRange.endDate,
-    });
-
-    // Query para el filtro de departamentos
+    // Query para departments (carga estática, cacheada por 5 min)
     const { data: departments = [] } = useQuery({
-        queryKey: ["departments-list"],
-        queryFn: scheduleService.getDepartments
+        queryKey: ["departments"],
+        queryFn: () => scheduleService.getDepartments(),
+        staleTime: 5 * 60 * 1000,
     });
 
+    const { data: branches = [] } = useQuery({
+        queryKey: ["branches"],
+        queryFn: () => scheduleService.getBranches(),
+        staleTime: 5 * 60 * 1000,
+    });
 
+    // Query principal del calendario
+    // - keepPreviousData: mantiene datos del mes anterior durante la transición
+    // - isLoading: solo true cuando NO hay datos Y se está haciendo fetch
+    const { data: rawData, isLoading } = useQuery({
+        queryKey: [SCHEDULE_CALENDAR_KEY, dateRange.startDate, dateRange.endDate, selectedDepartment, selectedBranch],
+        queryFn: () => {
+            if (!dateRange.startDate || !dateRange.endDate) return [];
+            return scheduleService.getEntriesByDateRange(
+                dateRange.startDate,
+                dateRange.endDate,
+                selectedDepartment || undefined,
+                selectedBranch || undefined,
+            );
+        },
+        enabled: !!dateRange.startDate && !!dateRange.endDate,
+        staleTime: 2 * 60 * 1000,
+    });
+
+    const entries = rawData ?? [];
 
     return {
         entries,
         departments,
-        isLoading: isLoadingEntries || isFetching,
+        branches,
+        isLoading,
         dateRange,
         setDateRange,
         selectedDepartment,
         setSelectedDepartment,
+        selectedBranch,
+        setSelectedBranch,
     };
 };

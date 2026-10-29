@@ -10,14 +10,15 @@ interface Props {
     nurse?: Nurse | null;
     isSubmitting: boolean;
     users: { id: string; firstName: string; lastName: string }[];
-    departments: { id: string; name: string }[];
+    departments: { id: string; name: string; branchId?: string | null; branches?: { branchId: string; isPrimary: boolean }[] }[];
+    branches: { id: string; name: string; organizationId: string }[];
     specialities: { id: string; name: string }[];
     organizations: { id: string; name: string }[];
     restrictionTypes?: { id: string; code: string; name: string }[];
 }
 
 export const NurseModal: React.FC<Props> = ({
-    isOpen, onClose, onSubmit, nurse, isSubmitting, users, departments, specialities, organizations, restrictionTypes = []
+    isOpen, onClose, onSubmit, nurse, isSubmitting, users, departments, branches, specialities, organizations, restrictionTypes = []
 }) => {
     const { register, handleSubmit, setValue, reset, watch, control, formState: { errors } } = useForm<NurseFormInputs>();
 
@@ -28,6 +29,46 @@ export const NurseModal: React.FC<Props> = ({
 
     // Observamos el valor actual del userId en React Hook Form
     const selectedUserId = watch("userId");
+    const selectedDepartmentId = watch("departmentId");
+    const selectedOrganizationId = watch("organizationId");
+    const selectedBranchId = watch("branchId");
+
+    const selectedDepartment = departments.find((d) => d.id === selectedDepartmentId);
+    const departmentBranchIds =
+        selectedDepartment?.branches?.map((link) => link.branchId) ?? [];
+    const branchOptions = branches.filter((branch) => {
+        if (selectedOrganizationId && branch.organizationId !== selectedOrganizationId) {
+            return false;
+        }
+        if (departmentBranchIds.length > 0) {
+            return departmentBranchIds.includes(branch.id);
+        }
+        return true;
+    });
+
+    useEffect(() => {
+        if (!isOpen || branchOptions.length === 0) return;
+        if (selectedBranchId && branchOptions.some((branch) => branch.id === selectedBranchId)) {
+            return;
+        }
+
+        const primaryBranchId =
+            selectedDepartment?.branches?.find((link) => link.isPrimary)?.branchId ||
+            selectedDepartment?.branchId ||
+            branchOptions[0]?.id ||
+            "";
+
+        if (primaryBranchId) {
+            setValue("branchId", primaryBranchId);
+        }
+    }, [
+        isOpen,
+        selectedBranchId,
+        selectedDepartmentId,
+        selectedOrganizationId,
+        branchOptions.map((branch) => branch.id).join("|"),
+        setValue,
+    ]);
 
     const { fields, append, remove } = useFieldArray({
         control,
@@ -67,6 +108,7 @@ export const NurseModal: React.FC<Props> = ({
                 reset({
                     userId: nurse.userId,
                     departmentId: nurse.departmentId,
+                    branchId: nurse.branchId || "",
                     specialityId: nurse.speciality?.id || "",
                     organizationId: nurse.organizationId,
                     contract_type: nurse.contract_type,
@@ -83,7 +125,7 @@ export const NurseModal: React.FC<Props> = ({
                 });
             } else {
                 reset({
-                    userId: "", departmentId: "", specialityId: "", organizationId: "",
+                    userId: "", departmentId: "", branchId: "", specialityId: "", organizationId: "",
                     contract_type: ContracTypeList.PERMANENT, status: NurseStatusType.ACTIVE,
                     hire_date: "", isCrossDepartmental: false,
                     birthDate: "", emergencyContactName: "", emergencyContactPhone: "",
@@ -207,6 +249,24 @@ export const NurseModal: React.FC<Props> = ({
                                     {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                                 </select>
                                 {errors.departmentId && <span className="text-xs text-red-500">{errors.departmentId.message}</span>}
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Sede (Sucursal)</label>
+                                <select
+                                    {...register("branchId")}
+                                    className="mt-1 block w-full rounded-lg border-gray-300 p-2 border shadow-sm"
+                                >
+                                    <option value="">Sin sede asignada</option>
+                                    {branchOptions.map((branch) => (
+                                        <option key={branch.id} value={branch.id}>{branch.name}</option>
+                                    ))}
+                                </select>
+                                {selectedDepartment && departmentBranchIds.length > 0 && (
+                                    <span className="text-[11px] text-gray-500">
+                                        Sedes habilitadas para el departamento: {branchOptions.map((branch) => branch.name).join(", ")}
+                                    </span>
+                                )}
                             </div>
 
                             <div>

@@ -7,6 +7,8 @@ export interface Shift {
     id: string;
     organizationId: string;
     departmentId: string;
+    branchId?: string | null;
+    branch?: { id: string; name: string } | null;
     name: string;
     code: string;
     type: string;
@@ -27,6 +29,8 @@ export interface ScheduleEntry {
     id: string;
     scheduleId: string;
     shiftId: string;
+    branchId?: string | null;
+    branch?: { id: string; name: string } | null;
     date: string; // ISO String de la fecha del turno
     status: ScheduleEntryStatus;
     nurseId: string | null;
@@ -40,6 +44,8 @@ export interface ScheduleEntry {
             lastName: string;
             email: string;
         };
+        branchId?: string | null;
+        branch?: { id: string; name: string } | null;
     } | null;
     shift: Shift;
     schedule: Schedule;
@@ -59,6 +65,9 @@ export interface Schedule {
     id: string;
     organizationId: string;
     departmentId: string;
+    branchId: string;
+    branch?: { id: string; name: string } | null;
+    department?: { id: string; name: string } | null;
     month: number;
     year: number;
     status: ScheduleStatus;

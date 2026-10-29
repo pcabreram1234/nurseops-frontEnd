@@ -96,6 +96,12 @@ export const ShiftDetailsModal: React.FC<Props> = ({ isOpen, onClose, entry }) =
                             </span>
                         </div>
                         <div>
+                            <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Sede</span>
+                            <span className="text-xs font-medium text-slate-600 mt-0.5 block truncate">
+                                📍 {entry.branch?.name || entry.nurse?.branch?.name || "Sin sede"}
+                            </span>
+                        </div>
+                        <div>
                             <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Esquema Aplicado</span>
                             <span className="text-xs font-medium text-slate-600 mt-0.5 block truncate">
                                 ⚙️ {templateName}

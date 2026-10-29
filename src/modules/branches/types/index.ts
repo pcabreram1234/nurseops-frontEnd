@@ -1,3 +1,16 @@
+export interface BranchDepartmentLink {
+    departmentId: string;
+    branchId: string;
+    isPrimary: boolean;
+    department: {
+        id: string;
+        name: string;
+        code?: string;
+        type?: string;
+        isActive?: boolean;
+    };
+}
+
 export interface Branch {
     id: string;
     organizationId: string;
@@ -18,10 +31,22 @@ export interface Branch {
     timezone?: string | null;
     isMainBranch: boolean;
     isActive: boolean;
-    departments?: [{
-        id: string;
-        name: string
-    }];
+    /** Sedes ↔ departamentos (tabla puente DepartmentBranch). */
+    departments?: BranchDepartmentLink[];
+    _count?: {
+        departments?: number;
+        users?: number;
+        nurses?: number;
+        schedules?: number;
+        scheduleEntries?: number;
+        shifts?: number;
+        shiftTemplates?: number;
+        absences?: number;
+        vacations?: number;
+        leaves?: number;
+        nurseAvailabilities?: number;
+        emergencyCoverages?: number;
+    };
 }
 
 export interface BranchFormData {

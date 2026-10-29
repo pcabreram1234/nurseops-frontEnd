@@ -1,5 +1,5 @@
 // @/modules/schedules/hooks/useShifts.ts
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { shiftService } from "../services/shiftService";
 
@@ -35,12 +35,12 @@ export const useShifts = (initialDepartmentId?: string) => {
      * Mapeo de la función imperativa anterior para que tu componente FullCalendar 
      * siga funcionando exactamente igual sin romper nada.
      */
-    const fetchShiftsForDay = (date: Date, currentDepartmentId?: string) => {
+    const fetchShiftsForDay = useCallback((date: Date, currentDepartmentId?: string) => {
         setSelectedDate(date);
         if (currentDepartmentId !== undefined) {
             setDepartmentId(currentDepartmentId);
         }
-    };
+    }, []);
 
     return {
         shifts,                         // Ahora viene directamente de la caché de TanStack Query

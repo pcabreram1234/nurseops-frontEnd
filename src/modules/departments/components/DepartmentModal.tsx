@@ -40,7 +40,8 @@ const departmentTypeLabels: Record<DepartmentType, string> = {
 export default function DepartmentModal({ isOpen, onClose, onSubmit, department, isSubmitting, organizations, branches }: Props) {
     const { register, handleSubmit, reset, setValue, watch } = useForm<DepartmentFormData>({
         defaultValues: {
-            name: "", code: "", description: "", organizationId: "", branchId: "",
+            name: "", code: "", description: "", organizationId: "",
+            branchIds: [], primaryBranchId: "", branchId: "",
             type: "GENERAL", criticalLevel: "MEDIUM", minimumStaff: 1, optimalStaff: 1, maxCapacity: 10,
             allowOvertime: true, allowsCrossDepartment: false, requiresSpecialization: false, isEmergencyDepartment: false,
             emergencyPriority: 1, isActive: true
@@ -48,7 +49,8 @@ export default function DepartmentModal({ isOpen, onClose, onSubmit, department,
     });
 
     const orgValue = watch("organizationId");
-    const branchValue = watch("branchId");
+    const selectedBranchIds = watch("branchIds") || [];
+    const primaryBranchIdValue = watch("primaryBranchId");
     const typeValue = watch("type");
     const criticalValue = watch("criticalLevel");
     const isEmergency = watch("isEmergencyDepartment");
@@ -61,18 +63,48 @@ export default function DepartmentModal({ isOpen, onClose, onSubmit, department,
     // Filtrar sucursales que pertenecen a la organización seleccionada
     const filteredBranches = branches.filter(b => b.organizationId === orgValue);
 
+    const toggleBranch = (branchId: string, checked: boolean) => {
+        const next = checked
+            ? Array.from(new Set([...selectedBranchIds, branchId]))
+            : selectedBranchIds.filter((id) => id !== branchId);
+
+        setValue("branchIds", next, { shouldValidate: true });
+
+        if (!next.includes(primaryBranchIdValue)) {
+            setValue("primaryBranchId", next[0] || "");
+        }
+    };
+
     useEffect(() => {
         if (!isOpen) return;
         if (department) {
+            const links = department.branches ?? [];
+            const branchIds = links.length
+                ? links.map((link) => link.branchId)
+                : department.branchId
+                    ? [department.branchId]
+                    : [];
+            const primaryBranchId =
+                links.find((link) => link.isPrimary)?.branchId ||
+                department.branchId ||
+                branchIds[0] ||
+                "";
+
             reset({
                 ...department,
+                branchIds,
+                primaryBranchId,
+                branchId: primaryBranchId,
                 emergencyPriority: department.emergencyPriority || 1,
             });
         } else {
+            const firstBranch = branches.find(b => b.organizationId === organizations[0]?.id);
             reset({
                 name: "", code: "", description: "",
                 organizationId: organizations[0]?.id || "",
-                branchId: branches.find(b => b.organizationId === organizations[0]?.id)?.id || "",
+                branchIds: firstBranch ? [firstBranch.id] : [],
+                primaryBranchId: firstBranch?.id || "",
+                branchId: firstBranch?.id || "",
                 type: "GENERAL", criticalLevel: "MEDIUM", minimumStaff: 2, optimalStaff: 5, maxCapacity: 20,
                 allowOvertime: true, allowsCrossDepartment: false, requiresSpecialization: false, isEmergencyDepartment: false,
                 emergencyPriority: 1, isActive: true
@@ -103,7 +135,9 @@ export default function DepartmentModal({ isOpen, onClose, onSubmit, department,
                             <Select value={orgValue || ""} onValueChange={(val: any) => {
                                 setValue("organizationId", val);
                                 const firstBranch = branches.find(b => b.organizationId === val);
-                                setValue("branchId", firstBranch ? firstBranch.id : "");
+                                setValue("branchIds", firstBranch ? [firstBranch.id] : []);
+                                setValue("primaryBranchId", firstBranch?.id || "");
+                                setValue("branchId", firstBranch?.id || "");
                             }}>
                                 {/* 🌟 Agregamos placeholder explícito por si el valor tarda en cargar */}
                                 <SelectTrigger>
@@ -123,26 +157,57 @@ export default function DepartmentModal({ isOpen, onClose, onSubmit, department,
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div className="space-y-1">
-                            <Label>Sucursal / Sede Asignada</Label>
-                            <Select value={branchValue || ""} onValueChange={(val) => setValue("branchId", val || "")}>
+                    {/* SECCIÓN DE SEDES (N:M) */}
+                    <div className="space-y-2 rounded-lg border bg-slate-50/60 p-4 dark:bg-slate-900/30">
+                        <div className="flex items-center justify-between">
+                            <Label>Sedes donde opera el departamento</Label>
+                            <span className="text-[10px] text-muted-foreground">{selectedBranchIds.length} seleccionada(s)</span>
+                        </div>
+                        {filteredBranches.length === 0 ? (
+                            <p className="text-xs text-muted-foreground">No hay sedes disponibles para esta organización.</p>
+                        ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
+                                {filteredBranches.map((b) => (
+                                    <label key={b.id} className="flex items-center gap-2 rounded-md border bg-white px-3 py-2 text-sm dark:bg-slate-950">
+                                        <input
+                                            type="checkbox"
+                                            className="h-4 w-4 accent-primary"
+                                            checked={selectedBranchIds.includes(b.id)}
+                                            onChange={(e) => toggleBranch(b.id, e.target.checked)}
+                                        />
+                                        <span className="truncate">{b.name}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        )}
+
+                        <div className="space-y-1 pt-1">
+                            <Label className="text-xs">Sede principal</Label>
+                            <Select
+                                value={primaryBranchIdValue || ""}
+                                onValueChange={(val) => {
+                                    setValue("primaryBranchId", val || "");
+                                    setValue("branchId", val || "");
+                                }}
+                                disabled={selectedBranchIds.length === 0}
+                            >
                                 <SelectTrigger>
-                                    {/* 🌟 SOLUCIÓN VISUAL CRÍTICA: Si Radix UI pierde la referencia por el ciclo de renderizado, 
-               buscamos manualmente el nombre de la organización en el catálogo para pintarlo directamente */}
-                                    <SelectValue placeholder="Seleccione Sucursal">
-                                        {branchValue
-                                            ? (branches.find(b => b.id === branchValue)?.name || "Cargando sucursal...")
-                                            : undefined
-                                        }
+                                    <SelectValue placeholder="Seleccione la sede principal">
+                                        {primaryBranchIdValue
+                                            ? filteredBranches.find(b => b.id === primaryBranchIdValue)?.name || "Cargando sede..."
+                                            : undefined}
                                     </SelectValue>
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {filteredBranches.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                                    {filteredBranches
+                                        .filter(b => selectedBranchIds.includes(b.id))
+                                        .map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
                                 </SelectContent>
                             </Select>
                         </div>
+                    </div>
 
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1">
                             <Label>Tipo de Departamento</Label>
                             <Select value={typeValue} onValueChange={(val) => setValue("type", val as DepartmentType)}>

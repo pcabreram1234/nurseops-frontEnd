@@ -7,6 +7,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 // 🟢 NUEVA INTERFAZ: Es el reflejo idéntico del GenerateScheduleDto de NestJS
 export interface GenerateSchedulePayload {
     departmentId: string;
+    branchId?: string;
     month: number; // Número entre 1 y 12
     year: number;  // Año de planificación (Ej: 2026)
 }
@@ -19,14 +20,25 @@ export interface GenerateScheduleResponse {
 }
 
 export const scheduleService = {
-    getEntriesByDateRange: async (startDate: string, endDate: string, departmentId?: string): Promise<ScheduleEntry[]> => {
+    getEntriesByDateRange: async (startDate: string, endDate: string, departmentId?: string, branchId?: string): Promise<ScheduleEntry[]> => {
         const params = new URLSearchParams({ startDate, endDate });
         if (departmentId) params.append("departmentId", departmentId);
+        if (branchId) params.append("branchId", branchId);
         const response = await apiInstance.get<ScheduleEntry[]>(`${API_URL}/schedule-entries`, { params });
         return response.data;
     },
 
-    getDepartments: async (): Promise<{ id: string, name: string }[]> => {
+    getBranches: async (): Promise<{ id: string; name: string; organizationId: string }[]> => {
+        const response = await apiInstance.get(`${API_URL}/branches`);
+        return response.data;
+    },
+
+    getDepartments: async (): Promise<{
+        id: string;
+        name: string;
+        branchId?: string | null;
+        branches?: { branchId: string; isPrimary: boolean; branch?: { id: string; name: string } | null }[];
+    }[]> => {
         const response = await apiInstance.get(`${API_URL}/departments`);
         return response.data;
     },
@@ -40,6 +52,11 @@ export const scheduleService = {
 
     updateEntry: async (id: string, data: { shiftId: string; nurseId: string; departmentId: string }): Promise<ScheduleEntry> => {
         const response = await apiInstance.patch<ScheduleEntry>(`${API_URL}/schedule-entries/${id}`, data);
+        return response.data;
+    },
+
+    create: async (data: { shiftId: string; nurseId: string; departmentId: string; shiftTemplateId?: string; date?: string }): Promise<ScheduleEntry> => {
+        const response = await apiInstance.post<ScheduleEntry>(`${API_URL}/schedule-entries`, data);
         return response.data;
     },
 
