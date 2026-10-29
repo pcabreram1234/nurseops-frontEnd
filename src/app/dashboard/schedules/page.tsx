@@ -1,13 +1,9 @@
 "use client"
 
-import React, { useState, useMemo, useRef, useCallback } from "react";
-import FullCalendar from "@fullcalendar/react";
-import dayGridPlugin from "@fullcalendar/daygrid";
-import timeGridPlugin from "@fullcalendar/timegrid";
-import interactionPlugin from "@fullcalendar/interaction";
-import esLocale from "@fullcalendar/core/locales/es";
+import React, { useState, useMemo, useCallback, useRef } from "react";
 import { useGlobalCalendar } from "@/modules/schedules/hooks/useGlobalCalendar";
 import { ScheduleEntry } from "@/modules/schedules/types";
+import { CalendarView } from "./CalendarView";
 import { ShiftDetailsModal } from "@/modules/schedules/components/ShiftDetailsModal";
 import { ScheduleEntryModal } from "@/modules/schedules/components/ScheduleEntryModal";
 import { useNurses } from "@/modules/nurses/hooks/useNurses";
@@ -82,24 +78,60 @@ const ActionDecisionModal: React.FC<DecisionModalProps> = ({ isOpen, onClose, on
 };
 
 export default function GlobalSchedulesPage() {
-    const { entries, departments, setDateRange, selectedDepartment, setSelectedDepartment } = useGlobalCalendar();
+    const { entries, departments, branches, setDateRange, selectedDepartment, setSelectedDepartment, selectedBranch, setSelectedBranch, isLoading } = useGlobalCalendar();
     const { createEntries, updateEntry: inlineUpdateMutation, deleteEntry, publishSchedule, genrateSchedule, isPublishing, isGenerating } = useScheduleEntries();
 
     const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
     const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [selectedDateForCreation, setSelectedDateForCreation] = useState<Date | null>(null);
+    const [selectedSingleEntryId, setSelectedSingleEntryId] = useState<string | null>(null);
 
-    const activeDeptName = useMemo(() => departments.find(d => d.id === selectedDepartment)?.name, [selectedDepartment, departments]);
+    const activeDeptName = useMemo(() => departments.find(d => d.id === selectedDepartment)?.name ?? "", [selectedDepartment, departments]);
+
+    const activeDepartment = useMemo(
+        () => departments.find((department: any) => department.id === selectedDepartment),
+        [departments, selectedDepartment],
+    );
+
+    const availableBranches = useMemo(() => {
+        const links = activeDepartment?.branches ?? [];
+        if (links.length > 0) {
+            return links
+                .map((link: any) => ({
+                    id: link.branch?.id || link.branchId,
+                    name: link.branch?.name || "Sede",
+                    isPrimary: link.isPrimary,
+                }))
+                .filter((branch: any) => branch.id);
+        }
+
+        if (selectedDepartment) {
+            const departmentBranchId = activeDepartment?.branchId;
+            return branches
+                .filter((branch) => !departmentBranchId || branch.id === departmentBranchId)
+                .map((branch) => ({ id: branch.id, name: branch.name, isPrimary: true }));
+        }
+
+        return branches.map((branch) => ({ ...branch, isPrimary: false }));
+    }, [activeDepartment, branches, selectedDepartment]);
+
+    const defaultBranchId = useMemo(() => {
+        if (selectedBranch) return selectedBranch;
+        return availableBranches.find((branch) => branch.isPrimary)?.id || availableBranches[0]?.id || "";
+    }, [availableBranches, selectedBranch]);
 
     const { nurses } = useNurses();
     const { shifts, fetchShiftsForDay } = useShifts(selectedDepartment);
+
+    // 🚀 REF PARA ESTABILIZAR CALLBACKS: Evita re-crear callbacks cuando cambia el filtro de departamento
+    const selectedDeptRef = useRef(selectedDepartment);
+    selectedDeptRef.current = selectedDepartment;
 
     const [viewMode, setViewMode] = useState<CalendarViewMode>("summary");
     const [isVacantCollapsed, setIsVacantCollapsed] = useState<boolean>(false);
 
     const [selectedEntry, setSelectedEntry] = useState<ScheduleEntry | null>(null);
-    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-    const [selectedDateForCreation, setSelectedDateForCreation] = useState<Date | null>(null);
-    const [selectedSingleEntryId, setSelectedSingleEntryId] = useState<string | null>(null);
     const [decisionTarget, setDecisionTarget] = useState<ScheduleEntry | null>(null);
 
     const [entryToDeleteId, setEntryToDeleteId] = useState<string | null>(null);
@@ -123,104 +155,8 @@ export default function GlobalSchedulesPage() {
         const firstEntry = entries[0];
         const scheduleId = firstEntry.scheduleId;
         const status = (firstEntry as any).schedule?.status || "DRAFT";
-        return { id: scheduleId, status: status as "DRAFT" | "PUBLISHED" | "EMPTY" };
+        return { id: scheduleId, status: status as "DRAFT" | "GENERATING" | "GENERATED" | "UNDER_REVIEW" | "APPROVED" | "PUBLISHED" | "ARCHIVED" | "CANCELLED" };
     }, [entries]);
-
-    const lastProcessedRange = useRef<{ start: string; end: string } | null>(null);
-
-    // 🚀 OPTIMIZACIÓN 2: Pre-calcular los strings e inyectarlos en "extendedProps".
-    // Esto hace que la pintura de los bloques sea instantánea.
-    const calendarEvents = useMemo(() => {
-        const events: any[] = [];
-        if (!entries) return events;
-
-        if (viewMode === "summary") {
-            const entriesByDate = new Map<string, { assigned: ScheduleEntry[], vacantCount: number }>();
-
-            entries.forEach(entry => {
-                const dateStr = entry.date.split("T")[0];
-                let dayData = entriesByDate.get(dateStr);
-                if (!dayData) {
-                    dayData = { assigned: [], vacantCount: 0 };
-                    entriesByDate.set(dateStr, dayData);
-                }
-                if (entry.nurseId && entry.nurse) dayData.assigned.push(entry);
-                else dayData.vacantCount++;
-            });
-
-            entriesByDate.forEach((dayData, dateStr) => {
-                dayData.assigned.forEach(entry => {
-                    const timeStart = entry.shift?.startTime?.split("T")[1] || "00:00:00Z";
-                    const timeEnd = entry.shift?.endTime?.split("T")[1] || "23:59:59Z";
-                    const baseColor = entry.isEmergencyCoverage ? "#dc2626" : (entry.shift?.color && entry.shift.color !== "#f3f4f6" ? entry.shift.color : "#2563eb");
-
-                    events.push({
-                        id: entry.id,
-                        title: `${entry.nurse?.user?.firstName} ${entry.nurse?.user?.lastName}`,
-                        start: `${dateStr}T${timeStart}`,
-                        end: `${dateStr}T${timeEnd}`,
-                        backgroundColor: baseColor,
-                        borderColor: "transparent",
-                        textColor: "#ffffff",
-                        extendedProps: {
-                            type: "assignment",
-                            entry,
-                            departmentName: entry?.shiftTemplate?.department?.name || "Gral",
-                            formattedTime: `${formatTimeStr(entry?.shift?.startTime)} - ${formatTimeStr(entry?.shift?.endTime)}`
-                        }
-                    });
-                });
-
-                if (dayData.vacantCount > 0 && !isVacantCollapsed) {
-                    events.push({
-                        id: `vacants-${dateStr}`,
-                        title: `➕ ${dayData.vacantCount} Vacantes`,
-                        start: dateStr,
-                        allDay: true,
-                        backgroundColor: "#fee2e2",
-                        textColor: "#991b1b",
-                        borderColor: "#fca5a5",
-                        extendedProps: { type: "vacant_summary", dateStr }
-                    });
-                }
-            });
-        } else {
-            entries.forEach((entry) => {
-                const dateOnly = entry.date.split("T")[0];
-                const timeStart = entry.shift?.startTime?.split("T")[1] || "00:00:00Z";
-                const timeEnd = entry.shift?.endTime?.split("T")[1] || "23:59:59Z";
-                const isVacant = !entry.nurseId || !entry.nurse;
-                const baseColor = isVacant ? "#475569" : (entry.isEmergencyCoverage ? "#dc2626" : (entry.shift?.color || "#2563eb"));
-
-                events.push({
-                    id: entry.id,
-                    title: isVacant ? "⚠️ VACANTE" : `${entry.nurse?.user?.firstName} ${entry.nurse?.user?.lastName}`,
-                    start: `${dateOnly}T${timeStart}`,
-                    end: `${dateOnly}T${timeEnd}`,
-                    backgroundColor: baseColor,
-                    textColor: "#ffffff",
-                    borderColor: "transparent",
-                    extendedProps: {
-                        type: "assignment",
-                        entry,
-                        departmentName: entry?.shiftTemplate?.department?.name || "Gral",
-                        formattedTime: `${formatTimeStr(entry?.shift?.startTime)} - ${formatTimeStr(entry?.shift?.endTime)}`
-                    }
-                });
-            });
-        }
-
-        return events;
-    }, [entries, viewMode, isVacantCollapsed]);
-
-    // 🚀 OPTIMIZACIÓN 3: Envolver funciones que se pasan al FullCalendar en useCallback
-    const handleDatesSet = useCallback((arg: any) => {
-        if (lastProcessedRange.current?.start === arg.startStr && lastProcessedRange.current?.end === arg.endStr) {
-            return;
-        }
-        lastProcessedRange.current = { start: arg.startStr, end: arg.endStr };
-        setDateRange({ startDate: arg.startStr, endDate: arg.endStr });
-    }, [setDateRange]);
 
     const renderEventContent = useCallback((arg: any) => {
         const { type, departmentName, formattedTime } = arg.event.extendedProps;
@@ -245,21 +181,48 @@ export default function GlobalSchedulesPage() {
         );
     }, []);
 
-    const handleCloseMainModal = () => {
+    const handleCloseMainModal = useCallback(() => {
         setIsCreateModalOpen(false);
         setSelectedDateForCreation(null);
         setSelectedSingleEntryId(null);
-    };
+    }, []);
 
-    const openManagementModal = (date: Date, singleId: string | null = null) => {
+    const openManagementModal = useCallback((date: Date, singleId: string | null = null) => {
         setSelectedDateForCreation(date);
         setSelectedSingleEntryId(singleId);
-        fetchShiftsForDay(date, selectedDepartment);
+        fetchShiftsForDay(date, selectedDeptRef.current);
         setIsCreateModalOpen(true);
-    };
+    }, [fetchShiftsForDay]);
+
+    const handleEventClick = useCallback((info: any) => {
+        const { type, entry, dateStr } = info.event.extendedProps;
+        if (type === "vacant_summary" && dateStr) {
+            openManagementModal(new Date(`${dateStr}T12:00:00`));
+        } else if (entry) {
+            setDecisionTarget(entry as ScheduleEntry);
+        }
+    }, [openManagementModal]);
+
+    const filteredEntriesForModal = useMemo(() => {
+        if (!selectedDateForCreation) return [];
+        return entries.filter(e => {
+            const offset = selectedDateForCreation.getTimezoneOffset() * 60000;
+            const localTargetDate = new Date(selectedDateForCreation.getTime() - offset).toISOString().split('T')[0];
+            const entryDate = e.date.split('T')[0];
+            const matchesDate = localTargetDate === entryDate;
+
+            let matchesDept = true;
+            if (selectedDepartment) {
+                const entryDeptId = (e.shiftTemplate as any)?.departmentId || e.shiftTemplate?.department.id || (e.shift as any)?.departmentId;
+                matchesDept = entryDeptId === selectedDepartment;
+            }
+            return matchesDate && matchesDept;
+        });
+    }, [entries, selectedDateForCreation, selectedDepartment]);
 
     return (
         <div className="p-6 bg-slate-50 min-h-screen transition-all">
+            {/* ENCABEZADO Y CONTROLES */}
             {/* ENCABEZADO Y CONTROLES */}
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 gap-4 bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
                 <div>
@@ -286,9 +249,16 @@ export default function GlobalSchedulesPage() {
                         </button>
                     </div>
 
-                    <select value={selectedDepartment} onChange={(e) => setSelectedDepartment(e.target.value)} className="rounded-xl border-slate-200 border p-2 text-sm shadow-sm bg-white font-medium text-slate-700 outline-none">
+                    <select value={selectedDepartment} onChange={(e) => { setSelectedDepartment(e.target.value); setSelectedBranch(""); }} className="rounded-xl border-slate-200 border p-2 text-sm shadow-sm bg-white font-medium text-slate-700 outline-none">
                         <option value="">Todos los Departamentos</option>
                         {departments.map((dep: any) => <option key={dep.id} value={dep.id}>{dep.name}</option>)}
+                    </select>
+
+                    <select value={selectedBranch} onChange={(e) => setSelectedBranch(e.target.value)} className="rounded-xl border-slate-200 border p-2 text-sm shadow-sm bg-white font-medium text-slate-700 outline-none">
+                        <option value="">Todas las Sedes</option>
+                        {(selectedDepartment ? availableBranches : branches).map((branch: any) => (
+                            <option key={branch.id} value={branch.id}>{branch.name}</option>
+                        ))}
                     </select>
                 </div>
             </div>
@@ -314,12 +284,12 @@ export default function GlobalSchedulesPage() {
                 })()}
 
                 <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
-                    {scheduleState.status === "DRAFT" && (
-                        <button onClick={() => setIsPublishModalOpen(true)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all">
+                    {scheduleState.status === "DRAFT" || scheduleState.status === "UNDER_REVIEW" || scheduleState.status === "GENERATED" && (
+                        <button onClick={() => setIsPublishModalOpen(true)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all cursor-pointer ">
                             📢 Publicar Horario...
                         </button>
                     )}
-                    <button onClick={() => setIsGenerateModalOpen(true)} className="px-4 py-2 bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 text-xs font-bold rounded-xl transition-all">
+                    <button onClick={() => setIsGenerateModalOpen(true)} className="px-4 py-2 bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 text-xs font-bold rounded-xl transition-all cursor-pointer">
                         🔄 Volver a Generar (Engine)...
                     </button>
                 </div>
@@ -327,33 +297,15 @@ export default function GlobalSchedulesPage() {
 
             {/* CALENDARIO */}
             <div className="bg-gray-50 p-6 rounded-2xl shadow-sm border border-slate-200 relative overflow-hidden">
-                <div className="fullcalendar-wrapper global-schedules-theme">
-                    {/* 🚀 OPTIMIZACIÓN 4: ELIMINAR LA KEY DINÁMICA.
-                        No le pases ninguna 'key' al FullCalendar. React mantendrá la instancia viva
-                        y las transiciones (cambios de array en events) las hará FullCalendar nativamente sin pestañear.
-                    */}
-                    <FullCalendar
-                        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-                        initialView="dayGridMonth"
-                        locales={[esLocale]}
-                        locale="es"
-                        headerToolbar={{ left: "prev,next today", center: "title", right: "dayGridMonth,timeGridWeek" }}
-                        events={calendarEvents} // Este array actualizará la vista sin destrozar el componente
-                        height="auto"
-                        navLinks={true}
-                        nowIndicator={true}
-                        eventContent={renderEventContent}
-                        datesSet={handleDatesSet}
-                        eventClick={(info) => {
-                            const { type, entry, dateStr } = info.event.extendedProps;
-                            if (type === "vacant_summary" && dateStr) {
-                                openManagementModal(new Date(`${dateStr}T12:00:00`));
-                            } else if (entry) {
-                                setDecisionTarget(entry as ScheduleEntry);
-                            }
-                        }}
-                    />
-                </div>
+                <CalendarView
+                    entries={entries}
+                    viewMode={viewMode}
+                    isVacantCollapsed={isVacantCollapsed}
+                    renderEventContent={renderEventContent}
+                    onEventClick={handleEventClick}
+                    onDateRangeChange={setDateRange}
+                    isLoading={isLoading}
+                />
             </div>
 
             {/* MODALES SECUNDARIOS */}
@@ -373,19 +325,7 @@ export default function GlobalSchedulesPage() {
                     onClose={handleCloseMainModal}
                     selectedDate={selectedDateForCreation}
                     singleEntryId={selectedSingleEntryId}
-                    existingEntries={entries.filter(e => {
-                        const offset = selectedDateForCreation.getTimezoneOffset() * 60000;
-                        const localTargetDate = new Date(selectedDateForCreation.getTime() - offset).toISOString().split('T')[0];
-                        const entryDate = e.date.split('T')[0];
-                        const matchesDate = localTargetDate === entryDate;
-
-                        let matchesDept = true;
-                        if (selectedDepartment) {
-                            const entryDeptId = (e.shiftTemplate as any)?.departmentId || e.shiftTemplate?.department.id || (e.shift as any)?.departmentId;
-                            matchesDept = entryDeptId === selectedDepartment;
-                        }
-                        return matchesDate && matchesDept;
-                    })}
+                    existingEntries={filteredEntriesForModal}
                     activeDepartmentId={selectedDepartment}
                     nurses={nurses || []}
                     shifts={shifts || []}
@@ -468,7 +408,10 @@ export default function GlobalSchedulesPage() {
                 isLoading={isPublishing}
                 onConfirm={async (payloadData) => {
                     try {
-                        // Construimos el Payload exacto uniendo el scheduleId maestro
+                        if (!scheduleState.id) {
+                            toast.error("No hay un horario activo para publicar.");
+                            return;
+                        }
                         await publishSchedule({
                             scheduleId: scheduleState.id,
                             ...payloadData
@@ -487,11 +430,14 @@ export default function GlobalSchedulesPage() {
                 onClose={() => setIsGenerateModalOpen(false)}
                 isLoading={isGenerating}
                 activeDepartmentName={activeDeptName}
+                branches={availableBranches}
+                defaultBranchId={defaultBranchId}
                 onConfirm={async (timePeriod) => {
                     try {
                         // Enviamos el departamento activo más el mes/año seleccionado en el DTO
                         await genrateSchedule({
                             departmentId: selectedDepartment,
+                            branchId: timePeriod.branchId,
                             month: timePeriod.month,
                             year: timePeriod.year
                         });

@@ -17,6 +17,7 @@ export default function UsersPage() {
     const [page, setPage] = useState(1);
     const [search, setSearch] = useState("");
     const [status, setStatus] = useState<string>("ALL");
+    const [branchFilter, setBranchFilter] = useState<string>("ALL");
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -27,13 +28,15 @@ export default function UsersPage() {
         page,
         limit: 10,
         search: search || undefined,
-        status: status === "ALL" ? undefined : status
+        status: status === "ALL" ? undefined : status,
+        branchId: branchFilter === "ALL" ? undefined : branchFilter,
     });
 
 
     // Consultas secundarias para alimentar los selects del modal
     const { data: orgs = [] } = useQuery({ queryKey: ["form-orgs"], queryFn: async () => (await apiInstance.get("/organizations")).data });
     const { data: depts = [] } = useQuery({ queryKey: ["form-depts"], queryFn: async () => (await apiInstance.get("/departments")).data });
+    const { data: branches = [] } = useQuery({ queryKey: ["form-branches"], queryFn: async () => (await apiInstance.get("/branches")).data });
     const { data: roles = [] } = useQuery({ queryKey: ["form-roles"], queryFn: async () => (await apiInstance.get("/roles")).data });
 
 
@@ -118,6 +121,17 @@ export default function UsersPage() {
                         </SelectContent>
                     </Select>
                 </div>
+                <div className="w-full sm:w-48">
+                    <Select value={branchFilter} onValueChange={(value) => { setBranchFilter(value || "ALL"); setPage(1); }}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Filtrar por Sede" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="ALL">Todas las Sedes</SelectItem>
+                            {branches.map((b: any) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                </div>
                 {isFetching && <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />}
             </div>
 
@@ -145,6 +159,7 @@ export default function UsersPage() {
                                             <th className="p-4">Nombre Completo</th>
                                             <th className="p-4">Correo</th>
                                             <th className="p-4">Organización</th>
+                                            <th className="p-4">Sede</th>
                                             <th className="p-4">Rol</th>
                                             <th className="p-4">Estado</th>
                                             <th className="p-4 text-right">Acciones</th>
@@ -159,6 +174,9 @@ export default function UsersPage() {
                                                 <td className="p-4 text-muted-foreground font-mono text-xs">{u.email}</td>
                                                 <td className="p-4 text-xs font-medium text-slate-700 dark:text-slate-300">
                                                     {u.organization?.name || "Sin Institución"}
+                                                </td>
+                                                <td className="p-4 text-xs text-slate-700 dark:text-slate-300">
+                                                    {u.branch?.name || "Sin sede"}
                                                 </td>
                                                 <td className="p-4">
                                                     <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-700 dark:text-slate-200">
@@ -225,6 +243,7 @@ export default function UsersPage() {
                 isSubmitting={isCreating || isUpdating}
                 organizations={orgs}
                 departments={depts}
+                branches={branches}
                 roles={roles}
             />
         </div>

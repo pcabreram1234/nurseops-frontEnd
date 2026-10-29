@@ -33,3 +33,15 @@ export interface Speciality {
     departmentSpecialities?: DepartmentSpecialityRelation[];
     // nurses?: any[];
 }
+
+// Pagination and Filters
+export interface SpecialityFilters {
+    search?: string;
+    page?: number;
+    limit?: number;
+}
+
+export interface PaginatedSpecialities {
+    data: Speciality[];
+    meta: { total: number; page: number; limit: number; totalPages: number };
+}

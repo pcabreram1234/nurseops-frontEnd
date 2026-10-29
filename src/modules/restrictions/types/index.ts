@@ -194,3 +194,17 @@ export interface RestrictionTypeFormInput {
     isSystem: boolean;
     isActive: boolean;
 }
+
+// Pagination and Filters
+export interface RestrictionFilters {
+    search?: string;
+    nurseId?: string;
+    restrictionTypeId?: string;
+    page?: number;
+    limit?: number;
+}
+
+export interface PaginatedRestrictions {
+    data: NurseRestriction[];
+    meta: { total: number; page: number; limit: number; totalPages: number };
+}

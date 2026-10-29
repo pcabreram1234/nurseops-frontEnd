@@ -1,47 +1,39 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { specialityService } from "@/modules/specialities/services/specialityService";
-import { Speciality, SpecialityFormData } from "@/modules/specialities/types";
+import { Speciality, SpecialityFormData, SpecialityFilters, PaginatedSpecialities } from "@/modules/specialities/types";
 import { toast } from "sonner";
 
-export const useSpecialities = () => {
+export const useSpecialities = (filters?: SpecialityFilters) => {
     const queryClient = useQueryClient();
 
-    // 1. Query para listar especialidades utilizando el servicio
-    const {
-        data: specialities = [],
-        isLoading,
-        isError,
-        refetch,
-    } = useQuery<Speciality[]>({
-        queryKey: ["specialities"],
-        queryFn: specialityService.getAll,
+    const query = useQuery<PaginatedSpecialities>({
+        queryKey: ["specialities", filters?.search, filters?.page, filters?.limit],
+        queryFn: () => specialityService.getAll(filters),
+        placeholderData: (prev) => prev,
     });
 
-    // 2. Mutation para crear utilizando el servicio
     const createMutation = useMutation({
         mutationFn: specialityService.create,
         onSuccess: () => {
-            // Invalida la caché para forzar que la tabla se actualice sola
             queryClient.invalidateQueries({ queryKey: ["specialities"] });
-            toast.success("Especialidad Creada")
-
+            toast.success("Especialidad Creada");
         },
         onError: (error) => {
             console.error("Error al crear la especialidad a través del servicio:", error);
+            toast.error("Error al crear la especialidad");
         },
     });
 
-    // 3. Mutation para actualizar utilizando el servicio
     const updateMutation = useMutation({
         mutationFn: ({ id, data }: { id: string; data: SpecialityFormData }) =>
             specialityService.update(id, data),
         onSuccess: () => {
-            // Invalida la caché para reflejar los cambios editados en la UI
             queryClient.invalidateQueries({ queryKey: ["specialities"] });
-            toast.success("Especialidad actualizada")
+            toast.success("Especialidad actualizada");
         },
         onError: (error) => {
-            console.error("Error al actualizar la especialidad a través del servicio:", error);
+            console.error("Error al actualizar la especialidad:", error);
+            toast.error("Error al actualizar la especialidad");
         },
     });
 
@@ -49,20 +41,26 @@ export const useSpecialities = () => {
         mutationFn: specialityService.delete,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["specialities"] });
-            toast.success("Especialidad borrada")
-        }
+            toast.success("Especialidad eliminada");
+        },
+        onError: (error) => {
+            console.error("Error al eliminar la especialidad:", error);
+            toast.error("Error al eliminar la especialidad");
+        },
     });
 
-    // Retornamos la misma interfaz para mantener compatibilidad con tu vista (page.tsx)
     return {
-        specialities,
-        isLoading: isLoading || createMutation.isPending || updateMutation.isPending,
-        isError,
+        specialities: query.data?.data || [],
+        meta: query.data?.meta || null,
+        isLoading: query.isLoading,
+        isFetching: query.isFetching,
+        isError: query.isError,
         createSpeciality: createMutation.mutateAsync,
-        updateSpeciality: async (id: string, data: SpecialityFormData) => {
-            return updateMutation.mutateAsync({ id, data });
-        },
+        isCreating: createMutation.isPending,
+        updateSpeciality: updateMutation.mutateAsync,
+        isUpdating: updateMutation.isPending,
         deleteSpeciality: deleteMutation.mutateAsync,
-        refetch,
+        isDeleting: deleteMutation.isPending,
+        refetch: query.refetch,
     };
 };
