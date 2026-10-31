@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useScheduleEntryValidation, NurseWithProfile, ShiftWithTemplate } from "../hooks/useScheduleEntryValidation";
@@ -104,12 +105,15 @@ export default function ScheduleEntryFormModal({ isOpen, onClose, onSubmit, entr
             reset({
                 scheduleId: entry.scheduleId,
                 nurseId: entry.nurseId || "",
-                shiftId: entry.shiftId,
+                shiftId: entry.shiftId || "",
                 shiftTemplateId: (entry as any).shiftTemplateId || "",
                 date: entry.date?.split("T")[0] || "",
                 notes: entry.notes || "",
                 isEmergencyCoverage: entry.isEmergencyCoverage || false,
             });
+            // Forzar re-carga de valores en los selects después de reset
+            setNurseValue(entry.nurseId || "");
+            setShiftValue(entry.shiftId || "");
         } else {
             reset({
                 scheduleId: shifts[0]?.shiftTemplateId ? "" : "",
@@ -117,28 +121,38 @@ export default function ScheduleEntryFormModal({ isOpen, onClose, onSubmit, entr
                 date: new Date().toISOString().split("T")[0],
                 notes: "", isEmergencyCoverage: false,
             });
+            setNurseValue("");
+            setShiftValue("");
         }
-    }, [isOpen, entry, shifts, reset]);
+    }, [isOpen, entry, shifts, reset, setNurseValue, setShiftValue]);
 
     const handleValidatedSubmit = async (data: any) => {
-        // Validación final antes de enviar
-        if (data.nurseId && data.nurseId !== "") {
-            const result = validateAssignment(data);
-            if (!result.canAssign) {
-                // Mostrar errores y no enviar
-                setValidationResult(result);
-                setShowValidation(true);
-                return;
-            }
-            // Si hay warnings, mostrar confirmación
-            if (result.warnings.length > 0) {
-                const confirmMessage = `Hay advertencias para esta asignación:\n\n${result.warnings.join("\n")}\n\n¿Desea continuar de todos modos?`;
-                if (!window.confirm(confirmMessage)) {
-                    return;
-                }
-            }
+        // 1. Asegurar valores por defecto para los campos críticos
+        // Esto evita que el backend reciba undefined en lugar de "" o valores válidos
+        const safeData = {
+            nurseId: data.nurseId || "",
+            shiftId: data.shiftId || "",
+            date: data.date || new Date().toISOString().split("T")[0],
+            status: data.status || "ASSIGNED",
+            notes: data.notes || "",
+            isEmergencyCoverage: data.isEmergencyCoverage || false,
+            scheduleId: data.scheduleId || "",
+            shiftTemplateId: data.shiftTemplateId || "",
+            departmentId: data.departmentId || "",
+        };
+
+        // 2. Validación orientativa (solo advertencias, NO bloquee el submit)
+        // El backend ya tiene su propia validación más estricta en schedule-entries.service.ts
+        const result = validateAssignment(safeData);
+
+        // 3. Si hay warnings, preguntar al usuario pero NO bloquear el submit
+        if (result.warnings.length > 0 && !window.confirm("Hay advertencias para esta asignación. ¿Continuar de todas formas?")) {
+            return;
         }
-        await onSubmit(data);
+
+        // 5. ENVIAR SEMPRE el DTO completo y seguro al backend
+        // El backend decidirá si la asignación es válida o no (hard block / soft block)
+        await onSubmit(safeData);
     };
 
     return (
@@ -159,7 +173,7 @@ export default function ScheduleEntryFormModal({ isOpen, onClose, onSubmit, entr
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1">
                             <Label>Personal de Enfermería</Label>
-                            <Select value={nurseValue || ""} onValueChange={(val) => val !== null && setValue("nurseId", val)}>
+                            <Select value={nurseValue || ""} onValueChange={ (val: any) => setValue("nurseId", val ?? "") }>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Seleccionar enfermera">
                                         {nurseValue
@@ -176,13 +190,13 @@ export default function ScheduleEntryFormModal({ isOpen, onClose, onSubmit, entr
                                         <SelectItem key={n.id} value={n.id}>
                                             {n.user ? `${n.user.firstName} ${n.user.lastName}` : n.id}
                                         </SelectItem>
-                                    ))}
+                                    ))
                                 </SelectContent>
                             </Select>
                         </div>
                         <div className="space-y-1">
                             <Label>Turno / Horario</Label>
-                            <Select value={shiftValue || ""} onValueChange={(val) => val !== null && setValue("shiftId", val)}>
+                            <Select value={shiftValue || ""} onValueChange={ (val: any) => setValue("shiftId", val ?? "") }>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Seleccionar turno">
                                         {shiftValue
@@ -196,7 +210,7 @@ export default function ScheduleEntryFormModal({ isOpen, onClose, onSubmit, entr
                                         <SelectItem key={s.id} value={s.id}>
                                             [{s.type}] {formatTime(s.startTime)} - {formatTime(s.endTime)}
                                         </SelectItem>
-                                    ))}
+                                    ))
                                 </SelectContent>
                             </Select>
                         </div>
@@ -213,8 +227,8 @@ export default function ScheduleEntryFormModal({ isOpen, onClose, onSubmit, entr
                                     </div>
                                     {validationResult.errors.map((err, i) => (
                                         <p key={i} className="text-sm text-red-600 dark:text-red-400">• {err}</p>
-                                    ))}
-                                </div>
+                                    ))
+                                )}
                             )}
                             {validationResult.warnings.length > 0 && (
                                 <div className="space-y-1 border-l-4 border-amber-500 pl-3">
@@ -224,8 +238,8 @@ export default function ScheduleEntryFormModal({ isOpen, onClose, onSubmit, entr
                                     </div>
                                     {validationResult.warnings.map((warn, i) => (
                                         <p key={i} className="text-sm text-amber-600 dark:text-amber-400">• {warn}</p>
-                                    ))}
-                                </div>
+                                    ))
+                                ))}
                             )}
                             {(validationResult.errors.length === 0 && validationResult.warnings.length === 0) && (
                                 <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
