@@ -111,20 +111,15 @@ export default function ScheduleEntryFormModal({ isOpen, onClose, onSubmit, entr
                 notes: entry.notes || "",
                 isEmergencyCoverage: entry.isEmergencyCoverage || false,
             });
-            // Forzar re-carga de valores en los selects después de reset
-            setNurseValue(entry.nurseId || "");
-            setShiftValue(entry.shiftId || "");
         } else {
             reset({
-                scheduleId: shifts[0]?.shiftTemplateId ? "" : "",
+                scheduleId: "",
                 nurseId: "", shiftId: "", shiftTemplateId: "",
                 date: new Date().toISOString().split("T")[0],
                 notes: "", isEmergencyCoverage: false,
             });
-            setNurseValue("");
-            setShiftValue("");
         }
-    }, [isOpen, entry, shifts, reset, setNurseValue, setShiftValue]);
+    }, [isOpen, entry, shifts, reset]);
 
     const handleValidatedSubmit = async (data: any) => {
         // 1. Asegurar valores por defecto para los campos críticos
@@ -173,30 +168,31 @@ export default function ScheduleEntryFormModal({ isOpen, onClose, onSubmit, entr
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1">
                             <Label>Personal de Enfermería</Label>
-                            <Select value={nurseValue || ""} onValueChange={ (val: any) => setValue("nurseId", val ?? "") }>
+                            <Select value={nurseValue || ""} onValueChange={(val: any) => setValue("nurseId", val === "UNASSIGNED" ? "" : (val ?? ""))}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Seleccionar enfermera">
                                         {nurseValue
                                             ? (nurses.find(n => n.id === nurseValue)?.user
                                                 ? `${nurses.find(n => n.id === nurseValue)?.user?.firstName} ${nurses.find(n => n.id === nurseValue)?.user?.lastName}`
                                                 : "Cargando...")
-                                            : undefined
+                                            : "Vacante / Sin asignar"
                                         }
                                     </SelectValue>
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="">-- Vacante / Sin asignar --</SelectItem>
+                                    <SelectItem value="UNASSIGNED">-- Vacante / Sin asignar --</SelectItem>
                                     {nurses.map(n => (
                                         <SelectItem key={n.id} value={n.id}>
                                             {n.user ? `${n.user.firstName} ${n.user.lastName}` : n.id}
                                         </SelectItem>
-                                    ))
+                                    ))}
                                 </SelectContent>
                             </Select>
                         </div>
+
                         <div className="space-y-1">
                             <Label>Turno / Horario</Label>
-                            <Select value={shiftValue || ""} onValueChange={ (val: any) => setValue("shiftId", val ?? "") }>
+                            <Select value={shiftValue || ""} onValueChange={(val: any) => setValue("shiftId", val ?? "")}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Seleccionar turno">
                                         {shiftValue
@@ -205,12 +201,12 @@ export default function ScheduleEntryFormModal({ isOpen, onClose, onSubmit, entr
                                         }
                                     </SelectValue>
                                 </SelectTrigger>
-                                <SelectContent style={{width:"100%"}} >
+                                <SelectContent className="w-full">
                                     {(filteredShifts.length > 0 ? filteredShifts : shifts).map(s => (
                                         <SelectItem key={s.id} value={s.id}>
                                             [{s.type}] {formatTime(s.startTime)} - {formatTime(s.endTime)}
                                         </SelectItem>
-                                    ))
+                                    ))}
                                 </SelectContent>
                             </Select>
                         </div>
@@ -226,9 +222,9 @@ export default function ScheduleEntryFormModal({ isOpen, onClose, onSubmit, entr
                                         <span className="font-semibold text-sm">Bloqueos detectados</span>
                                     </div>
                                     {validationResult.errors.map((err, i) => (
-                                        <p key={i} className="text-sm text-red-600 dark:text-red-400">• {err}</p>
-                                    ))
-                                )}
+                                        <p key={i} className="text-sm text-red-600 dark:text-red-400">{err}</p>
+                                    ))}
+                                </div>
                             )}
                             {validationResult.warnings.length > 0 && (
                                 <div className="space-y-1 border-l-4 border-amber-500 pl-3">
@@ -237,9 +233,9 @@ export default function ScheduleEntryFormModal({ isOpen, onClose, onSubmit, entr
                                         <span className="font-semibold text-sm">Advertencias</span>
                                     </div>
                                     {validationResult.warnings.map((warn, i) => (
-                                        <p key={i} className="text-sm text-amber-600 dark:text-amber-400">• {warn}</p>
-                                    ))
-                                ))}
+                                        <p key={i} className="text-sm text-amber-600 dark:text-amber-400">{warn}</p>
+                                    ))}
+                                </div>
                             )}
                             {(validationResult.errors.length === 0 && validationResult.warnings.length === 0) && (
                                 <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
