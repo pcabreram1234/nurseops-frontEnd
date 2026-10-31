@@ -66,8 +66,16 @@ const formatDate = (iso: string) => {
     return d.toLocaleDateString("es-ES", { weekday: "short", day: "2-digit", month: "2-digit" });
 };
 
-const formatTime = (time?: string) => {
+const formatTime = (time?: string | null): string => {
     if (!time) return "—";
+
+    // Si viene en formato ISO (contiene "T", ej: 2026-10-30T19:00:00.000Z)
+    if (time.includes("T")) {
+        const timePart = time.split("T")[1]; // Extrae "19:00:00.000Z"
+        return timePart ? timePart.slice(0, 5) : "—"; // Devuelve "19:00"
+    }
+
+    // Si ya viene como un string de hora plano (ej: "19:00:00" o "19:00")
     return time.slice(0, 5);
 };
 
@@ -106,6 +114,11 @@ export default function ScheduleEntriesPage() {
         queryKey: ["form-departments"],
         queryFn: async () => (await apiInstance.get("/departments")).data,
     });
+
+    const departmentsMap = useMemo(
+        () => new Map<string, string>(departments.map((d: {id: string, name: string}) => [d.id, d.name])),
+        [departments]
+    );
 
     const { data: nurses = [] } = useQuery({
         queryKey: ["form-nurses"],
@@ -478,6 +491,7 @@ export default function ScheduleEntriesPage() {
                 departments={departments}
                 nurses={nurses}
                 shifts={shifts}
+                departmentsMap={departmentsMap}
             />
 
             {/* MODAL DE DETALLE */}

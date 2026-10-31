@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { ScheduleEntry, ScheduleEntryFormData } from "../types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { useScheduleEntryValidation, NurseWithProfile, ShiftWithTemplate } from "../hooks/useScheduleEntryValidation";
+import { AlertCircle, CheckCircle2, AlertTriangle } from "lucide-react";
 
 interface Props {
     isOpen: boolean;
@@ -18,8 +20,9 @@ interface Props {
     entry?: ScheduleEntry | null;
     isSubmitting: boolean;
     departments: { id: string; name: string }[];
-    nurses: { id: string; user?: { firstName: string; lastName: string } }[];
-    shifts: { id: string; name: string; startTime: string; endTime: string; departmentId?: string; shiftTemplateId?: string }[];
+    nurses: NurseWithProfile[];
+    shifts: ShiftWithTemplate[];
+    departmentsMap?: Map<string, string>;
 }
 
 function formatTime(isoString?: string | null): string {
@@ -29,18 +32,52 @@ function formatTime(isoString?: string | null): string {
     return t ? t.substring(0, 5) : "--:--";
 }
 
-export default function ScheduleEntryFormModal({ isOpen, onClose, onSubmit, entry, isSubmitting, departments, nurses, shifts }: Props) {
-    const { register, handleSubmit, reset, setValue, watch } = useForm<any>({
+export default function ScheduleEntryFormModal({ isOpen, onClose, onSubmit, entry, isSubmitting, departments, nurses, shifts, departmentsMap }: Props) {
+    const { register, handleSubmit, reset, setValue, watch, formState: { errors: formErrors } } = useForm<any>({
         defaultValues: {
             scheduleId: "", nurseId: "", shiftId: "", shiftTemplateId: "",
             date: "", notes: "", isEmergencyCoverage: false,
         }
     });
 
+    const { validateAssignment } = useScheduleEntryValidation({ nurses, shifts, currentEntry: entry, departmentsMap });
+
     const shiftValue = watch("shiftId");
     const nurseValue = watch("nurseId");
     const dateValue = watch("date");
     const isEmergency = watch("isEmergencyCoverage");
+
+    // Estado para validaciones en tiempo real
+    const [validationResult, setValidationResult] = useState<{ canAssign: boolean; errors: string[]; warnings: string[] }>({
+        canAssign: true, errors: [], warnings: []
+    });
+    const [showValidation, setShowValidation] = useState(false);
+
+    // Validación en tiempo real cuando cambian los campos clave
+    useEffect(() => {
+        if (!nurseValue || !shiftValue || !dateValue) {
+            setValidationResult({ canAssign: true, errors: [], warnings: [] });
+            setShowValidation(false);
+            return;
+        }
+
+        // Solo validar si hay enfermera seleccionada (no vacante)
+        if (nurseValue !== "") {
+            const result = validateAssignment({
+                nurseId: nurseValue,
+                shiftId: shiftValue,
+                date: dateValue,
+                departmentId: "", // Se ignora en validación actual
+                notes: "",
+                isEmergencyCoverage: isEmergency
+            });
+            setValidationResult(result);
+            setShowValidation(true);
+        } else {
+            setValidationResult({ canAssign: true, errors: [], warnings: [] });
+            setShowValidation(false);
+        }
+    }, [nurseValue, shiftValue, dateValue, isEmergency, validateAssignment]);
 
     // Filter shifts by selected date
     const filteredShifts = useMemo(() => {
@@ -83,6 +120,27 @@ export default function ScheduleEntryFormModal({ isOpen, onClose, onSubmit, entr
         }
     }, [isOpen, entry, shifts, reset]);
 
+    const handleValidatedSubmit = async (data: any) => {
+        // Validación final antes de enviar
+        if (data.nurseId && data.nurseId !== "") {
+            const result = validateAssignment(data);
+            if (!result.canAssign) {
+                // Mostrar errores y no enviar
+                setValidationResult(result);
+                setShowValidation(true);
+                return;
+            }
+            // Si hay warnings, mostrar confirmación
+            if (result.warnings.length > 0) {
+                const confirmMessage = `Hay advertencias para esta asignación:\n\n${result.warnings.join("\n")}\n\n¿Desea continuar de todos modos?`;
+                if (!window.confirm(confirmMessage)) {
+                    return;
+                }
+            }
+        }
+        await onSubmit(data);
+    };
+
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
             <DialogContent className="sm:max-w-[550px] max-h-[85vh] overflow-y-auto p-6">
@@ -90,7 +148,7 @@ export default function ScheduleEntryFormModal({ isOpen, onClose, onSubmit, entr
                     <DialogTitle>{entry ? "Editar Asignación" : "Nueva Asignación Diaria"}</DialogTitle>
                 </DialogHeader>
 
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 pt-2">
+                <form onSubmit={handleSubmit(handleValidatedSubmit)} className="space-y-5 pt-2">
                     {/* FECHA */}
                     <div className="space-y-1">
                         <Label htmlFor="date">Fecha del Turno</Label>
@@ -128,21 +186,55 @@ export default function ScheduleEntryFormModal({ isOpen, onClose, onSubmit, entr
                                 <SelectTrigger>
                                     <SelectValue placeholder="Seleccionar turno">
                                         {shiftValue
-                                            ? (shifts.find(s => s.id === shiftValue)?.name || "Cargando...")
+                                            ? (shifts.find(s => s.id === shiftValue)?.type || "Cargando...")
                                             : undefined
                                         }
                                     </SelectValue>
                                 </SelectTrigger>
-                                <SelectContent>
+                                <SelectContent style={{width:"100%"}} >
                                     {(filteredShifts.length > 0 ? filteredShifts : shifts).map(s => (
                                         <SelectItem key={s.id} value={s.id}>
-                                            [{s.name}] {formatTime(s.startTime)} - {formatTime(s.endTime)}
+                                            [{s.type}] {formatTime(s.startTime)} - {formatTime(s.endTime)}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
                         </div>
                     </div>
+
+                    {/* VALIDATION FEEDBACK */}
+                    {showValidation && (validationResult.errors.length > 0 || validationResult.warnings.length > 0) && (
+                        <div className="rounded-lg border p-3 space-y-2 bg-slate-50 dark:bg-slate-900">
+                            {validationResult.errors.length > 0 && (
+                                <div className="space-y-1 border-l-4 border-red-500 pl-3">
+                                    <div className="flex items-center gap-2 text-red-700 dark:text-red-300">
+                                        <AlertCircle className="h-4 w-4" />
+                                        <span className="font-semibold text-sm">Bloqueos detectados</span>
+                                    </div>
+                                    {validationResult.errors.map((err, i) => (
+                                        <p key={i} className="text-sm text-red-600 dark:text-red-400">• {err}</p>
+                                    ))}
+                                </div>
+                            )}
+                            {validationResult.warnings.length > 0 && (
+                                <div className="space-y-1 border-l-4 border-amber-500 pl-3">
+                                    <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
+                                        <AlertTriangle className="h-4 w-4" />
+                                        <span className="font-semibold text-sm">Advertencias</span>
+                                    </div>
+                                    {validationResult.warnings.map((warn, i) => (
+                                        <p key={i} className="text-sm text-amber-600 dark:text-amber-400">• {warn}</p>
+                                    ))}
+                                </div>
+                            )}
+                            {(validationResult.errors.length === 0 && validationResult.warnings.length === 0) && (
+                                <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
+                                    <CheckCircle2 className="h-4 w-4" />
+                                    <span className="font-semibold text-sm">Validación correcta - Asignación permitida</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* NOTAS */}
                     <div className="space-y-1">
@@ -165,7 +257,7 @@ export default function ScheduleEntryFormModal({ isOpen, onClose, onSubmit, entr
 
                     <DialogFooter className="pt-2 border-t">
                         <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
-                        <Button type="submit" disabled={isSubmitting}>
+                        <Button type="submit" disabled={isSubmitting || (showValidation && validationResult.errors.length > 0)}>
                             {isSubmitting ? "Guardando..." : entry ? "Actualizar Asignación" : "Crear Asignación"}
                         </Button>
                     </DialogFooter>

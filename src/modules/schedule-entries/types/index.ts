@@ -41,6 +41,7 @@ export interface ScheduleEntryFormData {
     nurseId: string;
     shiftId: string;
     departmentId: string;
+    date: string;
     notes?: string;
     isEmergencyCoverage?: boolean;
 }

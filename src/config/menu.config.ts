@@ -6,7 +6,9 @@ import {
     AlertTriangle,
     SlidersHorizontal,
     LayoutDashboard,
-    ShieldAlert
+    ShieldAlert,
+    FileText,
+    Palmtree
 } from "lucide-react";
 
 export interface SubMenuItem {
@@ -74,6 +76,24 @@ export const MENU_ITEMS: MenuItem[] = [
         ],
     },
     {
+        title: "Vacaciones y Políticas",
+        icon: Palmtree,
+        allowedRoles: ["SUPER", "ADMIN", "SUPERVISOR"],
+        children: [
+            { title: "Solicitudes de Vacaciones", href: "/dashboard/vacations", allowedRoles: ["SUPER", "ADMIN", "SUPERVISOR", "NURSE"] },
+            { title: "Políticas de Vacaciones", href: "/dashboard/settings/vacation-policies", allowedRoles: ["SUPER", "ADMIN"] },
+        ],
+    },
+    {
+        title: "Gestión Documental",
+        icon: FileText,
+        allowedRoles: ["SUPER", "ADMIN", "SUPERVISOR"],
+        children: [
+            { title: "Documentos Generados", href: "/dashboard/documents", allowedRoles: ["SUPER", "ADMIN", "SUPERVISOR"] },
+            { title: "Plantillas de Documentos", href: "/dashboard/settings/document-templates", allowedRoles: ["SUPER", "ADMIN"] },
+        ],
+    },
+    {
         title: "Métricas y Alertas",
         icon: AlertTriangle,
         allowedRoles: ["SUPER", "ADMIN", "SUPERVISOR"],
@@ -89,6 +109,8 @@ export const MENU_ITEMS: MenuItem[] = [
         allowedRoles: ["SUPER", "ADMIN"],
         children: [
             { title: "Reglas de Negocio", href: "/dashboard/settings/rules", allowedRoles: ["SUPER", "ADMIN"] },
+            { title: "Políticas de Vacaciones", href: "/dashboard/settings/vacation-policies", allowedRoles: ["SUPER", "ADMIN"] },
+            { title: "Plantillas de Documentos", href: "/dashboard/settings/document-templates", allowedRoles: ["SUPER", "ADMIN"] },
             { title: "Integraciones API", href: "/dashboard/settings/integrations", allowedRoles: ["SUPER"] },
             { title: "Auditoría (Audit Logs)", href: "/dashboard/settings/audit-logs", allowedRoles: ["SUPER"] },
         ],
