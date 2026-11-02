@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { useSchedules, useScheduleEntryStats } from "@/modules/schedule-entries/hooks/useScheduleEntriesPage";
+import { useSchedulesEntries, useScheduleEntryStats } from "@/modules/schedule-entries/hooks/useScheduleEntriesPage";
 import { ScheduleEntry, ScheduleEntryStatus } from "@/modules/schedule-entries/types";
 import ScheduleEntryFormModal from "@/modules/schedule-entries/components/ScheduleEntryFormModal";
 import ScheduleEntryDetailModal from "@/modules/schedule-entries/components/ScheduleEntryDetailModal";
@@ -90,6 +90,7 @@ export default function ScheduleEntriesPage() {
     const [dateTo, setDateTo] = useState<string>(DEFAULT_END_DATE);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedEntry, setSelectedEntry] = useState<ScheduleEntry | null>(null);
+    const [backendErrors, setBackendErrors] = useState<string[]>([]);
     const [isDetailOpen, setIsDetailOpen] = useState(false);
 
     const baseFilters = useMemo(() => ({
@@ -107,7 +108,7 @@ export default function ScheduleEntriesPage() {
         limit: PAGE_SIZE,
     }), [baseFilters, page]);
 
-    const { entries, meta, isLoading, isFetching, error, createEntry, isCreating, updateEntry, isUpdating, deleteEntry, isDeleting } = useSchedules(filters);
+    const { entries, meta, isLoading, isFetching, error, createEntry, isCreating, updateEntry, isUpdating, deleteEntry, isDeleting } = useSchedulesEntries(filters);
     const { stats: serverStats, isFetchingStats } = useScheduleEntryStats(baseFilters);
 
     const { data: departments = [] } = useQuery({
@@ -116,7 +117,7 @@ export default function ScheduleEntriesPage() {
     });
 
     const departmentsMap = useMemo(
-        () => new Map<string, string>(departments.map((d: {id: string, name: string}) => [d.id, d.name])),
+        () => new Map<string, string>(departments.map((d: { id: string, name: string }) => [d.id, d.name])),
         [departments]
     );
 
@@ -135,8 +136,8 @@ export default function ScheduleEntriesPage() {
         queryFn: async () => (await apiInstance.get("/branches")).data,
     });
 
-    const handleOpenCreate = () => { setSelectedEntry(null); setIsModalOpen(true); };
-    const handleOpenEdit = (entry: ScheduleEntry) => { setSelectedEntry(entry); setIsModalOpen(true); };
+    const handleOpenCreate = () => { setBackendErrors([]); setSelectedEntry(null); setIsModalOpen(true); };
+    const handleOpenEdit = (entry: ScheduleEntry) => { setBackendErrors([]); setSelectedEntry(entry); setIsModalOpen(true); };
     const handleOpenDetail = (entry: ScheduleEntry) => { setSelectedEntry(entry); setIsDetailOpen(true); };
 
     const handleDelete = async (id: string) => {
@@ -146,13 +147,24 @@ export default function ScheduleEntriesPage() {
     };
 
     const handleFormSubmit = async (data: any) => {
-        if (selectedEntry) {
-            await updateEntry({ id: selectedEntry.id, ...data });
-        } else {
-            await createEntry(data);
+        try {
+            if (selectedEntry) {
+                await updateEntry({ id: selectedEntry.id, data: data });
+            } else {
+                await createEntry(data);
+            }
+            // Éxito: limpiar errores y cerrar modal
+            setBackendErrors([]);
+            setIsModalOpen(false);
+            setSelectedEntry(null);
+        } catch (error: any) {
+            // Error: extraer mensaje del backend y mantener modal abierto
+            const backendMsg = error?.response?.data?.message 
+                || error?.message 
+                || "Error desconocido";
+            setBackendErrors(Array.isArray(backendMsg) ? backendMsg : [backendMsg]);
+            // NO cerrar modal - el usuario puede revisar y corregir
         }
-        setIsModalOpen(false);
-        setSelectedEntry(null);
     };
 
     const filteredEntries = entries;
@@ -492,6 +504,7 @@ export default function ScheduleEntriesPage() {
                 nurses={nurses}
                 shifts={shifts}
                 departmentsMap={departmentsMap}
+                backendErrors={backendErrors}
             />
 
             {/* MODAL DE DETALLE */}

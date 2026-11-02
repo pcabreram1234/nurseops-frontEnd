@@ -8,7 +8,7 @@ import { toast } from "sonner";
 
 export const SCHEDULE_ENTRIES_KEY = "schedules";
 
-export function useSchedules(filters?: ScheduleEntryFilters) {
+export function useSchedulesEntries(filters?: ScheduleEntryFilters) {
     const queryClient = useQueryClient();
 
     const invalidate = () => queryClient.invalidateQueries({ queryKey: [SCHEDULE_ENTRIES_KEY] });
@@ -41,16 +41,16 @@ export function useSchedules(filters?: ScheduleEntryFilters) {
         },
         onError: (error: any) => {
             const msg = error?.response?.data?.message || error?.message || "Error al crear la asignación";
-            toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
+            // toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
         },
     });
 
     const updateMutation = useMutation({
-        mutationFn: ({ id, data }: { id: string; data: any }) => scheduleService.update(id, data),
+        mutationFn: ({ id, data }: { id: string; data: any }) => scheduleEntryService.update(id, data),
         onSuccess: () => { invalidate(); toast.success("Asignación actualizada"); },
         onError: (error: any) => {
             const msg = error?.response?.data?.message || error?.message || "Error al actualizar la asignación";
-            toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
+            // toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
         },
     });
 
@@ -59,13 +59,13 @@ export function useSchedules(filters?: ScheduleEntryFilters) {
         onSuccess: () => { invalidate(); toast.success("Asignación eliminada"); },
         onError: (error: any) => {
             const msg = error?.response?.data?.message || error?.message || "Error al eliminar la asignación";
-            toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
+            // toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
         },
     });
 
     return {
         entries: query.data?.data || [],
-        meta: query.data?.meta || null,
+        meta: query?.data?.meta ?? { total: 0, page: 1, limit: 25, totalPages: 0 },
         isLoading: query.isLoading,
         isFetching: query.isFetching,
         error: query.error,

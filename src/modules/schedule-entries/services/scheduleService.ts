@@ -28,8 +28,22 @@ export const scheduleService = {
         return (resp as any)?.data || resp;
     },
 
-    update: async (id: string, data: { shiftId?: string; nurseId?: string; departmentId?: string; notes?: string; isEmergencyCoverage?: boolean }): Promise<ScheduleEntry> => {
+    update: async (id: string,
+        data: {
+            status?: string;
+            notes?: string;
+            isEmergencyCoverage?: boolean
+            optimizationScore?: number;
+            departmentId?: string;
+            nurseId?: string;
+            shiftId?: string;
+            shiftTemplateId?: string;
+            date?: string;
+            scheduleId?: string;
+        }): Promise<ScheduleEntry> => {
         const resp = await apiInstance.patch(`/schedule-entries/${id}`, data);
+        console.log(data)
+        console.log(resp.data)
         return (resp as any)?.data || resp;
     },
 

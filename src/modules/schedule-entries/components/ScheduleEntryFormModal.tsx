@@ -24,6 +24,7 @@ interface Props {
     nurses: NurseWithProfile[];
     shifts: ShiftWithTemplate[];
     departmentsMap?: Map<string, string>;
+    backendErrors: string[];
 }
 
 function formatTime(isoString?: string | null): string {
@@ -33,7 +34,7 @@ function formatTime(isoString?: string | null): string {
     return t ? t.substring(0, 5) : "--:--";
 }
 
-export default function ScheduleEntryFormModal({ isOpen, onClose, onSubmit, entry, isSubmitting, departments, nurses, shifts, departmentsMap }: Props) {
+export default function ScheduleEntryFormModal({ isOpen, onClose, onSubmit, entry, isSubmitting, departments, nurses, shifts, departmentsMap, backendErrors }: Props) {
     const { register, handleSubmit, reset, setValue, watch, formState: { errors: formErrors } } = useForm<any>({
         defaultValues: {
             scheduleId: "", nurseId: "", shiftId: "", shiftTemplateId: "",
@@ -53,6 +54,7 @@ export default function ScheduleEntryFormModal({ isOpen, onClose, onSubmit, entr
         canAssign: true, errors: [], warnings: []
     });
     const [showValidation, setShowValidation] = useState(false);
+    // backendErrors viene del componente padre (page.tsx)
 
     // Validación en tiempo real cuando cambian los campos clave
     useEffect(() => {
@@ -125,15 +127,16 @@ export default function ScheduleEntryFormModal({ isOpen, onClose, onSubmit, entr
         // 1. Asegurar valores por defecto para los campos críticos
         // Esto evita que el backend reciba undefined en lugar de "" o valores válidos
         const safeData = {
-            nurseId: data.nurseId || "",
-            shiftId: data.shiftId || "",
-            date: data.date || new Date().toISOString().split("T")[0],
-            status: data.status || "ASSIGNED",
+            status: "ASSIGNED",
             notes: data.notes || "",
             isEmergencyCoverage: data.isEmergencyCoverage || false,
-            scheduleId: data.scheduleId || "",
+            optimizationScore: null,
+            departmentId: entry?.shift?.departmentId || "",
+            nurseId: data.nurseId || "",
+            shiftId: data.shiftId || "",
             shiftTemplateId: data.shiftTemplateId || "",
-            departmentId: data.departmentId || "",
+            date: data.date || new Date().toISOString().split("T")[0],
+            scheduleId: data.scheduleId || "",
         };
 
         // 2. Validación orientativa (solo advertencias, NO bloquee el submit)
@@ -145,8 +148,8 @@ export default function ScheduleEntryFormModal({ isOpen, onClose, onSubmit, entr
             return;
         }
 
-        // 5. ENVIAR SEMPRE el DTO completo y seguro al backend
-        // El backend decidirá si la asignación es válida o no (hard block / soft block)
+        // 5. ENVIAR el DTO al backend
+        // El padre (page.tsx) maneja errores y actualiza backendErrors
         await onSubmit(safeData);
     };
 
@@ -213,8 +216,19 @@ export default function ScheduleEntryFormModal({ isOpen, onClose, onSubmit, entr
                     </div>
 
                     {/* VALIDATION FEEDBACK */}
-                    {showValidation && (validationResult.errors.length > 0 || validationResult.warnings.length > 0) && (
+                    {((showValidation && (validationResult.errors.length > 0 || validationResult.warnings.length > 0)) || backendErrors.length > 0) && (
                         <div className="rounded-lg border p-3 space-y-2 bg-slate-50 dark:bg-slate-900">
+                            {backendErrors.length > 0 && (
+                                <div className="space-y-1 border-l-4 border-red-500 pl-3">
+                                    <div className="flex items-center gap-2 text-red-700 dark:text-red-300">
+                                        <AlertCircle className="h-4 w-4" />
+                                        <span className="font-semibold text-sm">Error del Servidor</span>
+                                    </div>
+                                    {backendErrors.map((err, i) => (
+                                        <p key={i} className="text-sm text-red-600 dark:text-red-400">{err}</p>
+                                    ))}
+                                </div>
+                            )}
                             {validationResult.errors.length > 0 && (
                                 <div className="space-y-1 border-l-4 border-red-500 pl-3">
                                     <div className="flex items-center gap-2 text-red-700 dark:text-red-300">
@@ -237,7 +251,7 @@ export default function ScheduleEntryFormModal({ isOpen, onClose, onSubmit, entr
                                     ))}
                                 </div>
                             )}
-                            {(validationResult.errors.length === 0 && validationResult.warnings.length === 0) && (
+                            {(validationResult.errors.length === 0 && validationResult.warnings.length === 0 && backendErrors.length === 0) && (
                                 <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
                                     <CheckCircle2 className="h-4 w-4" />
                                     <span className="font-semibold text-sm">Validación correcta - Asignación permitida</span>

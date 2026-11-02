@@ -27,6 +27,7 @@ export const scheduleEntryService = {
         if (filters?.limit) params.append("limit", String(filters.limit));
         const resp: any = await apiInstance.get("/schedule-entries", { params });
         // El ResponseInterceptor del backend promueve `meta` como hermano de `data`
+        console.log(resp)
         if (resp?.data && resp?.meta) {
             return { data: resp.data, meta: resp.meta };
         }
@@ -63,7 +64,19 @@ export const scheduleEntryService = {
         return (resp as any)?.data || resp || [];
     },
 
-    update: async (id: string, data: { shiftId?: string; nurseId?: string; departmentId?: string; notes?: string; status?: string; isEmergencyCoverage?: boolean; shiftTemplateId?: string }): Promise<ScheduleEntry> => {
+    update: async (id: string, data:
+        {
+            status?: string;
+            notes?: string;
+            isEmergencyCoverage?: boolean
+            optimizationScore?: number;
+            departmentId?: string;
+            nurseId?: string;
+            shiftId?: string;
+            shiftTemplateId?: string;
+            date?: string;
+            scheduleId?: string;
+        }): Promise<ScheduleEntry> => {
         const resp = await apiInstance.patch(`/schedule-entries/${id}`, data);
         return (resp as any)?.data || resp;
     },

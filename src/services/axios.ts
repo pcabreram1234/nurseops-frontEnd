@@ -38,7 +38,7 @@ apiInstance.interceptors.response.use(
       console.log("⚡ Token actualizado automáticamente por actividad.");
       localStorage.setItem('auth_token', nuevoToken); // Sobrescribe el viejo token expirado
     }
-    
+
     /**
      * CASO DE ÉXITO (HTTP Status 2xx)
      * Si el backend responde con éxito y adjunta una propiedad 'mensaje',
