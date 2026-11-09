@@ -31,7 +31,8 @@ export interface ScheduleEntry {
     };
     shiftTemplate?: {
         id: string;
-        name: string;
+        type: string;
+        name?: string | null;
         departmentId?: string;
         department?: { id: string; name: string };
     };
