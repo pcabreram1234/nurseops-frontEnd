@@ -101,10 +101,11 @@ export default function ShiftTemplatesPage() {
     const filteredTemplates = useMemo(() => {
         return templates.filter((t) => {
             const matchesSearch =
-                t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (t.name ?? "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+                t.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 t.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 t.department?.name?.toLowerCase().includes(searchTerm.toLowerCase());
-            const matchesType = typeFilter === "ALL" || t.name === typeFilter;
+            const matchesType = typeFilter === "ALL" || t.type === typeFilter;
             const matchesBranch = branchFilter === "ALL" || t.branchId === branchFilter || t.branch?.id === branchFilter;
             return matchesSearch && matchesType && matchesBranch;
         });
@@ -215,8 +216,8 @@ export default function ShiftTemplatesPage() {
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="border-b bg-slate-50/50 dark:bg-slate-900/20">
-                                        <th className="text-left px-4 py-3 text-xs font-bold text-muted-foreground uppercase">Nombre</th>
-                                        <th className="text-left px-4 py-3 text-xs font-bold text-muted-foreground uppercase">Tipo</th>
+                                        <th className="text-left px-4 py-3 text-xs font-bold text-muted-foreground uppercase">Tipo (Sistema)</th>
+                                        <th className="text-left px-4 py-3 text-xs font-bold text-muted-foreground uppercase">Nombre (Usuario)</th>
                                         <th className="text-left px-4 py-3 text-xs font-bold text-muted-foreground uppercase">Sede</th>
                                         <th className="text-left px-4 py-3 text-xs font-bold text-muted-foreground uppercase">Departamento</th>
                                         <th className="text-left px-4 py-3 text-xs font-bold text-muted-foreground uppercase">Horario</th>
@@ -231,12 +232,15 @@ export default function ShiftTemplatesPage() {
                                         <tr key={t.id} className="border-b hover:bg-slate-50/50 dark:hover:bg-slate-900/20 transition-colors">
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-lg">{shiftTypeIcons[t.name]}</span>
-                                                    <span className="font-semibold text-sm">{shiftTypeLabels[t.name] || t.name}</span>
-                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${shiftTypeBadgeColors[t.name]}`}>
-                                                        {t.name}
+                                                    <span className="text-lg">{shiftTypeIcons[t.type]}</span>
+                                                    <span className="font-semibold text-sm">{shiftTypeLabels[t.type] || t.type}</span>
+                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${shiftTypeBadgeColors[t.type]}`}>
+                                                        {t.type}
                                                     </span>
                                                 </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-muted-foreground">
+                                                {t.name || <span className="italic text-slate-400">Sin nombre</span>}
                                             </td>
                                             <td className="px-4 py-3 text-xs font-semibold text-slate-600 dark:text-slate-400">
                                                 {t.branch?.name || "N/A"}

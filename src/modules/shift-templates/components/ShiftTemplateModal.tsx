@@ -61,7 +61,7 @@ function calculateIsNightShift(startTime: string, endTime: string): boolean {
 export default function ShiftTemplateModal({ isOpen, onClose, onSubmit, template, isSubmitting, departments, branches, organizations }: Props) {
     const { register, handleSubmit, reset, setValue, watch } = useForm<ShiftTemplateFormData>({
         defaultValues: {
-            organizationId: "", branchId: "", departmentId: "", name: "MORNING",
+            organizationId: "", branchId: "", departmentId: "", type: "MORNING", name: "",
             minimum_staff: 1, durationHours: 8, isNightShift: false,
             description: "", configuration: {},
             startTime: "07:00", endTime: "15:00",
@@ -72,6 +72,7 @@ export default function ShiftTemplateModal({ isOpen, onClose, onSubmit, template
     const orgValue = watch("organizationId");
     const branchValue = watch("branchId");
     const deptValue = watch("departmentId");
+    const typeValue = watch("type");
     const nameValue = watch("name");
     const startTimeValue = watch("startTime");
     const endTimeValue = watch("endTime");
@@ -96,20 +97,20 @@ export default function ShiftTemplateModal({ isOpen, onClose, onSubmit, template
             const isNight = calculateIsNightShift(startTimeValue, endTimeValue);
             setValue("durationHours", dur);
             setValue("isNightShift", isNight);
-            if (isNight && !nameValue.includes("NIGHT")) {
-                setValue("name", "NIGHT");
-            } else if (!isNight && nameValue === "NIGHT") {
-                setValue("name", "MORNING");
+            if (isNight && !typeValue.includes("NIGHT")) {
+                setValue("type", "NIGHT");
+            } else if (!isNight && typeValue === "NIGHT") {
+                setValue("type", "MORNING");
             }
         }
-    }, [startTimeValue, endTimeValue, setValue, nameValue]);
+    }, [startTimeValue, endTimeValue, setValue, typeValue]);
 
     // Auto-set color based on shift type
     useEffect(() => {
-        if (nameValue && shiftTypeColors[nameValue as PreferredShift]) {
-            setValue("color", shiftTypeColors[nameValue as PreferredShift]);
+        if (typeValue && shiftTypeColors[typeValue as PreferredShift]) {
+            setValue("color", shiftTypeColors[typeValue as PreferredShift]);
         }
-    }, [nameValue, setValue]);
+    }, [typeValue, setValue]);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -118,7 +119,8 @@ export default function ShiftTemplateModal({ isOpen, onClose, onSubmit, template
                 organizationId: template.organizationId,
                 branchId: template.branchId,
                 departmentId: template.departmentId || "",
-                name: template.name,
+                type: template.type,
+                name: template.name || "",
                 minimum_staff: template.minimum_staff,
                 durationHours: template.durationHours,
                 isNightShift: template.isNightShift,
@@ -126,7 +128,7 @@ export default function ShiftTemplateModal({ isOpen, onClose, onSubmit, template
                 configuration: template.configuration || {},
                 startTime: template.startTime,
                 endTime: template.endTime,
-                color: template.color || shiftTypeColors[template.name] || "#3b82f6",
+                color: template.color || shiftTypeColors[template.type] || "#3b82f6",
                 isActive: template.isActive,
                 autoAssignable: template.autoAssignable,
                 priority: template.priority,
@@ -136,7 +138,8 @@ export default function ShiftTemplateModal({ isOpen, onClose, onSubmit, template
                 organizationId: organizations[0]?.id || "",
                 branchId: branches.find((branch) => branch.organizationId === organizations[0]?.id)?.id || "",
                 departmentId: "",
-                name: "MORNING",
+                type: "MORNING",
+                name: "",
                 minimum_staff: 1, durationHours: 8, isNightShift: false,
                 description: "", configuration: {},
                 startTime: "07:00", endTime: "15:00",
@@ -213,11 +216,11 @@ export default function ShiftTemplateModal({ isOpen, onClose, onSubmit, template
 
                     {/* SECCIÓN 2: TIPO DE TURNO */}
                     <div className="space-y-1">
-                        <Label>Tipo de Turno</Label>
-                        <Select value={nameValue} onValueChange={(val) => setValue("name", val as PreferredShift)}>
+                        <Label>Tipo de Turno (sistema)</Label>
+                        <Select value={typeValue} onValueChange={(val) => setValue("type", val as PreferredShift)}>
                             <SelectTrigger>
                                 <SelectValue placeholder="Seleccionar tipo">
-                                    {nameValue ? shiftTypeLabels[nameValue as PreferredShift] : undefined}
+                                    {typeValue ? shiftTypeLabels[typeValue as PreferredShift] : undefined}
                                 </SelectValue>
                             </SelectTrigger>
                             <SelectContent>
@@ -226,6 +229,18 @@ export default function ShiftTemplateModal({ isOpen, onClose, onSubmit, template
                                 ))}
                             </SelectContent>
                         </Select>
+                        <p className="text-[10px] text-muted-foreground">Tipo técnico usado por el motor de schedules (ej: MORNING, AFTERNOON, NIGHT).</p>
+                    </div>
+
+                    {/* SECCIÓN 2b: NOMBRE VISIBLE */}
+                    <div className="space-y-1">
+                        <Label>Nombre para el usuario</Label>
+                        <Input
+                            id="templateName"
+                            placeholder="Ej: Mañana, Tarde, Noche, Turno Particular..."
+                            {...register("name")}
+                        />
+                        <p className="text-[10px] text-muted-foreground">Nombre legible que verá el usuario en su idioma (opcional).</p>
                     </div>
 
                     {/* SECCIÓN 3: HORARIO */}

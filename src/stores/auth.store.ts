@@ -8,7 +8,7 @@ export interface AuthUser {
     email: string;
     name: string;
     organizationId: string;
-    role: 'ADMIN' | 'SUPERVISOR' | 'NURSE' | 'SUPER'; // Tipado fuerte para tus roles
+    role: 'SUPER' | 'SYSTEM_ADMIN' | 'SUPERVISOR' | 'DEPARTMENT_HEAD' | 'NURSE_SENIOR' | 'NURSE_JUNIOR' | 'TEMP_NURSE' | 'HR_MANAGER' | 'NIGHT_SUPERVISOR' | 'AUDITOR' | 'READ_ONLY_VIEWER'; // Roles reales de la base de datos
     permissions: string[]; // Por lo general los permisos son un array de strings (ej: ['create:users', 'read:shifts'])
 }
 

@@ -5,7 +5,8 @@ export interface ShiftTemplate {
     organizationId: string;
     branchId: string;
     departmentId?: string | null;
-    name: PreferredShift;
+    type: PreferredShift;
+    name?: string | null;
     minimum_staff: number;
     durationHours: number;
     isNightShift: boolean;
@@ -27,7 +28,8 @@ export interface ShiftTemplateFormData {
     organizationId: string;
     branchId: string;
     departmentId?: string;
-    name: PreferredShift;
+    type: PreferredShift;
+    name?: string;
     minimum_staff: number;
     durationHours: number;
     isNightShift: boolean;
