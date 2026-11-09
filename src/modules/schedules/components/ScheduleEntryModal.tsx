@@ -201,7 +201,7 @@ export const ScheduleEntryModal: React.FC<Props> = ({
         return existingEntries.filter((entry) => {
             const fullName = `${entry.nurse?.user?.firstName || ""} ${entry.nurse?.user?.lastName || ""}`.toLowerCase();
             const deptName = entry.shiftTemplate?.department?.name?.toLowerCase() || "";
-            const shiftType = (entry.shift?.type || entry.shiftTemplate?.name || "").toLowerCase();
+            const shiftType = (entry.shift?.type || entry.shiftTemplate?.type || "").toLowerCase();
             return fullName.includes(target) || deptName.includes(target) || shiftType.includes(target);
         });
     }, [existingEntries, searchTerm, isSingleEditMode, singleEntryId]);
@@ -362,7 +362,7 @@ export const ScheduleEntryModal: React.FC<Props> = ({
                         <div className="p-6 overflow-y-auto flex-1 space-y-2">
                             {filteredEntries.map((entry) => {
                                 const isEditingThis = editingEntryId === entry.id;
-                                const shiftType: string = entry.shift?.type || entry.shiftTemplate?.name || "UNKNOWN";
+                                const shiftType: string = entry.shift?.type || entry.shiftTemplate?.type || "UNKNOWN";
                                 const badgeClass = typeStyles[shiftType] || typeStyles.UNKNOWN;
                                 const rowValidation = validationMap[entry.id];
 

@@ -126,7 +126,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       )}
-      {role === "ADMIN" && (
+      {role === "SYSTEM_ADMIN" && (
         <Card className="border-red-200 bg-red-50/30 dark:border-red-900 dark:bg-red-950/20">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-red-800 dark:text-red-300 flex items-center gap-2">
@@ -152,7 +152,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       )}
-      {role === "NURSE" && (
+      {role === "SUPER" || role === "SYSTEM_ADMIN" || role === "SUPERVISOR" || role === "NURSE_SENIOR" || role === "NURSE_JUNIOR" || role === "TEMP_NURSE" && (
         <Card className="border-blue-200 bg-blue-50/30 dark:border-blue-900 dark:bg-blue-950/20">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-blue-800 dark:text-blue-300 flex items-center gap-2">

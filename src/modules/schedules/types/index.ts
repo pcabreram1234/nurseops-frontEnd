@@ -50,7 +50,8 @@ export interface ScheduleEntry {
     shift: Shift;
     schedule: Schedule;
     shiftTemplate?: {
-        name: string;
+        type: string;
+        name?: string | null;
         startTime: string;
         endTime: string;
         department: {
